@@ -240,6 +240,280 @@ python ssh_helper.py "cd /home/tactical/racing_analytics && find src -type d -na
 **Problem: "paramiko module not found"**
 - **Solution:** Install dependencies: `pip install paramiko python-dotenv`
 
+## Production Server Directory Structure
+
+**Base Path:** `/home/tactical/racing_analytics`
+**Production Dashboard:** http://200.58.107.214:8050
+**Production API:** http://200.58.107.214:8000
+**Python Version:** 3.11.2
+
+### Directory Tree
+```
+/home/tactical/racing_analytics/
+├── data/                    # Processed data and models
+├── deployment/              # Deployment scripts
+├── logs/                    # Application logs (dashboard.log, api.log)
+├── src/                     # Source code
+│   ├── __pycache__/
+│   ├── api/                 # FastAPI backend
+│   │   └── __pycache__/
+│   ├── dashboard/           # Dash frontend
+│   │   ├── __pycache__/
+│   │   ├── assets/          # CSS, images, tour.css
+│   │   └── tour/            # Welcome tour system
+│   ├── data_processing/     # Feature engineering, data loaders
+│   │   └── __pycache__/
+│   ├── insights/            # Production analysis module
+│   │   └── __pycache__/
+│   ├── models/              # ML models
+│   │   ├── baseline/        # LightGBM, XGBoost, CatBoost
+│   │   └── inference/       # Model inference
+│   ├── services/            # Business logic (telemetry analyzer)
+│   └── track_data/          # Track metadata, images
+├── tests/                   # Test suite
+│   ├── dashboard/
+│   └── insights/
+├── venv/                    # Virtual environment (Python 3.11)
+│   ├── bin/                 # Python, pip, uvicorn executables
+│   │   ├── python           # /home/tactical/racing_analytics/venv/bin/python
+│   │   ├── pip
+│   │   └── uvicorn
+│   ├── lib/python3.11/      # Installed packages
+│   └── share/
+├── master_racing_data.csv   # Main data file (auto-loaded)
+├── api.log                  # API logs
+├── dashboard.log            # Dashboard logs
+└── README.md                # Project documentation
+```
+
+### Key Files and Locations
+```bash
+# Main application files
+/home/tactical/racing_analytics/src/dashboard/app.py          # Dashboard entry point
+/home/tactical/racing_analytics/src/api/main.py               # API entry point
+/home/tactical/racing_analytics/master_racing_data.csv        # Data file (71,000 samples)
+
+# Log files
+/home/tactical/racing_analytics/api.log                       # API server logs
+/home/tactical/racing_analytics/dashboard.log                 # Dashboard logs
+
+# Python environment
+/home/tactical/racing_analytics/venv/bin/python               # Python 3.11.2
+/home/tactical/racing_analytics/venv/bin/pip                  # Package manager
+/home/tactical/racing_analytics/venv/bin/uvicorn              # ASGI server
+
+# Configuration
+/home/tactical/racing_analytics/.env                          # Environment variables (SSH_*, API config)
+```
+
+### Process Management
+```bash
+# Running processes (check with ps aux)
+python src/dashboard/app.py                                   # Dashboard on port 8050
+python -m uvicorn src.api.main:app --port 8000                # API on port 8000
+```
+
+## Common Linux Commands for Production Server
+
+**IMPORTANT:** Always use `python ssh_helper.py "command"` instead of raw SSH commands!
+
+### Service Status Checks
+```bash
+# Check dashboard status
+python ssh_helper.py "ps aux | grep dashboard | grep -v grep"
+
+# Check API status
+python ssh_helper.py "ps aux | grep uvicorn | grep -v grep"
+
+# Check both services
+python ssh_helper.py "ps aux | grep -E '(dashboard|uvicorn)' | grep -v grep"
+
+# Check listening ports
+python ssh_helper.py "netstat -tlnp | grep -E '8050|8000'"
+# Or with ss (modern alternative)
+python ssh_helper.py "ss -tlnp | grep -E '8050|8000'"
+```
+
+### Log Management
+```bash
+# View last 30 lines of API log
+python ssh_helper.py "cd /home/tactical/racing_analytics && tail -30 api.log"
+
+# View last 30 lines of dashboard log
+python ssh_helper.py "cd /home/tactical/racing_analytics && tail -30 dashboard.log"
+
+# Follow API log in real-time (use Ctrl+C to stop)
+python ssh_helper.py "cd /home/tactical/racing_analytics && tail -f api.log"
+
+# Search for errors in logs
+python ssh_helper.py "cd /home/tactical/racing_analytics && grep -i error api.log | tail -20"
+
+# Check log file sizes
+python ssh_helper.py "cd /home/tactical/racing_analytics && ls -lh *.log"
+```
+
+### Service Restart
+```bash
+# Restart API (kill and restart)
+python ssh_helper.py "pkill -f 'uvicorn.*api' && sleep 2 && cd /home/tactical/racing_analytics && nohup venv/bin/python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 1 --timeout-keep-alive 30 > api.log 2>&1 &"
+
+# Restart dashboard (kill and restart)
+python ssh_helper.py "pkill -f 'dashboard' && sleep 2 && cd /home/tactical/racing_analytics && nohup venv/bin/python src/dashboard/app.py > dashboard.log 2>&1 &"
+
+# Graceful stop (SIGTERM)
+python ssh_helper.py "pkill -15 -f 'uvicorn.*api'"
+
+# Force stop (SIGKILL) - use only if graceful stop fails
+python ssh_helper.py "pkill -9 -f 'uvicorn.*api'"
+```
+
+### Disk and File Management
+```bash
+# Check disk usage of entire directory
+python ssh_helper.py "cd /home/tactical/racing_analytics && du -sh ."
+
+# Check disk usage by subdirectory
+python ssh_helper.py "cd /home/tactical/racing_analytics && du -sh */ | sort -h"
+
+# Check free disk space
+python ssh_helper.py "df -h /home/tactical/racing_analytics"
+
+# List files with sizes
+python ssh_helper.py "cd /home/tactical/racing_analytics && ls -lh"
+
+# Find large files (>100MB)
+python ssh_helper.py "cd /home/tactical/racing_analytics && find . -type f -size +100M -exec ls -lh {} \;"
+```
+
+### Python Package Management
+```bash
+# List installed packages
+python ssh_helper.py "cd /home/tactical/racing_analytics && venv/bin/pip list"
+
+# Check specific package version
+python ssh_helper.py "cd /home/tactical/racing_analytics && venv/bin/pip show lightgbm"
+
+# Install package
+python ssh_helper.py "cd /home/tactical/racing_analytics && venv/bin/pip install package_name"
+
+# Upgrade package
+python ssh_helper.py "cd /home/tactical/racing_analytics && venv/bin/pip install --upgrade package_name"
+
+# Install from requirements.txt
+python ssh_helper.py "cd /home/tactical/racing_analytics && venv/bin/pip install -r requirements.txt"
+```
+
+### Python Cache Management
+```bash
+# Clear all __pycache__ directories (fixes import errors)
+python ssh_helper.py "cd /home/tactical/racing_analytics && find src -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true"
+
+# Clear specific module cache
+python ssh_helper.py "cd /home/tactical/racing_analytics && rm -rf src/api/__pycache__"
+
+# Clear all .pyc files
+python ssh_helper.py "cd /home/tactical/racing_analytics && find src -name '*.pyc' -delete"
+```
+
+### File Operations
+```bash
+# Check if file exists
+python ssh_helper.py "cd /home/tactical/racing_analytics && test -f master_racing_data.csv && echo 'EXISTS' || echo 'NOT FOUND'"
+
+# View file contents
+python ssh_helper.py "cd /home/tactical/racing_analytics && cat README.md"
+
+# Count lines in file
+python ssh_helper.py "cd /home/tactical/racing_analytics && wc -l master_racing_data.csv"
+
+# Get file information
+python ssh_helper.py "cd /home/tactical/racing_analytics && stat master_racing_data.csv"
+
+# Create directory
+python ssh_helper.py "cd /home/tactical/racing_analytics && mkdir -p new_directory"
+
+# Remove file (careful!)
+python ssh_helper.py "cd /home/tactical/racing_analytics && rm file_to_delete.txt"
+
+# Remove directory (careful!)
+python ssh_helper.py "cd /home/tactical/racing_analytics && rm -rf directory_to_delete"
+```
+
+### System Information
+```bash
+# Check Python version
+python ssh_helper.py "cd /home/tactical/racing_analytics && venv/bin/python --version"
+
+# Check system resources
+python ssh_helper.py "free -h"
+
+# Check CPU usage
+python ssh_helper.py "top -bn1 | head -20"
+
+# Check system uptime
+python ssh_helper.py "uptime"
+
+# Check network connectivity
+python ssh_helper.py "curl -I http://localhost:8050"
+```
+
+### Deployment Quick Commands
+```bash
+# Quick deploy app.py changes
+python quick_upload_app.py
+
+# Quick deploy src/insights changes
+python deploy_insights.py
+
+# Full deployment (all files)
+python deployment/deploy.py
+```
+
+### Troubleshooting Common Issues
+```bash
+# Issue: API not responding
+# 1. Check if process is running
+python ssh_helper.py "ps aux | grep uvicorn"
+
+# 2. Check port
+python ssh_helper.py "netstat -tlnp | grep 8000"
+
+# 3. Check recent errors
+python ssh_helper.py "cd /home/tactical/racing_analytics && tail -50 api.log | grep -i error"
+
+# 4. Restart API
+python ssh_helper.py "pkill -f uvicorn && sleep 2 && cd /home/tactical/racing_analytics && nohup venv/bin/python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &"
+
+# Issue: Dashboard not loading
+# 1. Check process
+python ssh_helper.py "ps aux | grep dashboard"
+
+# 2. Check logs
+python ssh_helper.py "cd /home/tactical/racing_analytics && tail -50 dashboard.log"
+
+# 3. Clear Python cache and restart
+python ssh_helper.py "cd /home/tactical/racing_analytics && find src -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true"
+
+# Issue: Import errors after code changes
+# Clear Python cache (ALWAYS do this after deployment)
+python ssh_helper.py "cd /home/tactical/racing_analytics && find src -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true"
+```
+
+### Performance Optimization
+```bash
+# Monitor resource usage
+python ssh_helper.py "top -bn1 | grep python"
+
+# Check memory usage by process
+python ssh_helper.py "ps aux --sort=-%mem | grep python | head -5"
+
+# Check CPU usage by process
+python ssh_helper.py "ps aux --sort=-%cpu | grep python | head -5"
+
+# Monitor disk I/O
+python ssh_helper.py "iostat -x 1 5"
+```
+
 ## Tour System & Auto-Load Features
 
 ### Welcome Tour System (Phase 1 MVP - November 3, 2025)
