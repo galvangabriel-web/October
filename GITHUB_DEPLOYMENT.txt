@@ -1,0 +1,257 @@
+================================================================================
+  GITHUB REPOSITORY DEPLOYMENT GUIDE
+  GR Cup Racing Analytics - Production Ready
+================================================================================
+
+OVERVIEW
+--------
+This guide explains how to deploy the racing analytics project to GitHub with:
+- Source code and trained models (INCLUDED)
+- Markdown documentation files (EXCLUDED - per .gitignore)
+- CSV data files (EXCLUDED - too large, per .gitignore)
+- index.html as main technical documentation (INCLUDED)
+
+WHAT'S INCLUDED IN GITHUB REPO
+-------------------------------
+✅ src/ - All source code (dashboard, API, insights, models, services)
+✅ data/models/ - Trained models (Sequential LightGBM, 97.49% R²)
+✅ tests/ - Test suite (198 test cases)
+✅ deployment/ - Production deployment scripts
+✅ index.html - Comprehensive technical documentation
+✅ README.md - Minimal landing page (points to index.html)
+✅ requirements.txt - Python dependencies
+✅ setup.bat, setup.sh - Environment setup scripts
+✅ data_loader.py, analyze_all_data.py - Core utilities
+
+WHAT'S EXCLUDED (per .gitignore)
+---------------------------------
+❌ *.md files (except README.md) - All markdown documentation
+❌ *.csv, *.parquet - Data files (too large)
+❌ organized_data/, new_data/ - Raw telemetry data (18.5GB)
+❌ venv/, myenv/ - Virtual environments
+❌ __pycache__/, *.pyc - Python cache
+❌ .env - Credentials
+
+STEP-BY-STEP DEPLOYMENT
+------------------------
+
+1. INITIALIZE/UPDATE GIT REPOSITORY
+   ---------------------------------
+   # If not already a git repo:
+   git init
+
+   # Add GitHub remote (replace with your repo URL):
+   git remote add origin https://github.com/YOUR_USERNAME/gr-cup-racing-analytics.git
+
+   # Or update existing remote:
+   git remote set-url origin https://github.com/YOUR_USERNAME/gr-cup-racing-analytics.git
+
+2. VERIFY .gitignore IS WORKING
+   -----------------------------
+   git status --short
+
+   You should see:
+   - Modified: README.md, .gitignore, CLAUDE.md
+   - Deleted: Many .md files (excluded by .gitignore)
+   - Untracked: index.html, data/models/, src/dashboard/assets/, etc.
+
+   You should NOT see:
+   - *.csv files
+   - organized_data/ or new_data/
+   - Other .md files (except README.md)
+
+3. STAGE IMPORTANT FILES
+   ----------------------
+   # Stage source code
+   git add src/
+
+   # Stage models (IMPORTANT: These are included!)
+   git add data/models/
+
+   # Stage tests
+   git add tests/
+
+   # Stage deployment scripts
+   git add deployment/
+
+   # Stage core files
+   git add README.md
+   git add index.html
+   git add .gitignore
+   git add requirements.txt
+   git add setup.bat setup.sh
+   git add data_loader.py
+   git add analyze_all_data.py
+   git add inventory_data.py
+
+   # Stage this guide
+   git add GITHUB_DEPLOYMENT.txt
+
+   # Optionally stage CLAUDE.md for development reference
+   git add CLAUDE.md
+
+4. COMMIT CHANGES
+   --------------
+   git commit -m "feat: GitHub deployment - source code, models, and HTML documentation
+
+- Add comprehensive HTML technical documentation (index.html)
+- Update README.md to point to index.html
+- Include trained models (97.49% R² Sequential LightGBM)
+- Exclude all markdown documentation (except README.md)
+- Exclude CSV data files (too large for GitHub)
+- Production ready: Dashboard + API + Tests + Deployment scripts
+
+Sprint 2 Complete: Pattern Analysis, Corner Intelligence, Track Intelligence
+Deployed: November 2025 (Linux server, full capabilities)"
+
+5. PUSH TO GITHUB
+   --------------
+   # Push to main branch
+   git push -u origin main
+
+   # Or force push if needed (use with caution):
+   git push -u origin main --force
+
+6. SETUP GITHUB PAGES (OPTIONAL - for index.html)
+   ----------------------------------------------
+   Option A: Use GitHub Pages to serve index.html
+
+   1. Go to GitHub repository settings
+   2. Scroll to "Pages" section
+   3. Source: Deploy from branch
+   4. Branch: main
+   5. Folder: / (root)
+   6. Click "Save"
+   7. Wait 1-2 minutes for deployment
+   8. Access at: https://YOUR_USERNAME.github.io/gr-cup-racing-analytics/
+
+   Option B: Direct link to index.html
+
+   Users can view index.html directly in GitHub by clicking it in the file browser.
+   GitHub will render the HTML with full styling.
+
+   Option C: Use README.md as landing page
+
+   The README.md already points to index.html, so users see the link immediately.
+
+7. UPDATE REPOSITORY SETTINGS
+   ---------------------------
+   1. Repository name: "gr-cup-racing-analytics" (or your preference)
+   2. Description: "Professional Racing Telemetry Analysis - 97.49% R² Lap Time Prediction | Sequential LightGBM | 10-Tab Dashboard | Production Ready"
+   3. Topics/Tags:
+      - racing-telemetry
+      - machine-learning
+      - lightgbm
+      - lap-time-prediction
+      - motorsport-analytics
+      - gr-cup
+      - dash-plotly
+      - fastapi
+      - python
+      - data-science
+   4. Website: Link to your deployed dashboard (if public)
+
+VERIFY DEPLOYMENT
+-----------------
+After pushing to GitHub:
+
+1. Check repository file structure:
+   ✅ src/ directory with all modules
+   ✅ data/models/ directory with .pkl or .txt model files
+   ✅ tests/ directory with test files
+   ✅ index.html showing in root
+   ✅ README.md showing as landing page
+
+2. Check exclusions are working:
+   ❌ No *.md files (except README.md and CLAUDE.md if staged)
+   ❌ No *.csv files
+   ❌ No organized_data/ or new_data/ directories
+   ❌ No venv/ or myenv/ directories
+
+3. Test index.html:
+   - Click index.html in GitHub file browser
+   - Verify it renders with full styling
+   - Check all sections load correctly
+
+4. Test README.md:
+   - Verify badges display correctly
+   - Check link to index.html works
+
+REPOSITORY SIZE EXPECTATIONS
+----------------------------
+With models included:
+- Source code: ~5-10 MB
+- Trained models: Varies (check data/models/ size)
+- Tests: ~1-2 MB
+- Total: ~20-50 MB (acceptable for GitHub)
+
+Without large data files (CSV, organized_data/):
+- GitHub free tier limit: 100 GB
+- This project should be well under limit
+
+TROUBLESHOOTING
+---------------
+
+Problem: Models not uploading (too large)
+Solution:
+- Check file size: GitHub max file size is 100MB
+- If models > 100MB, use Git LFS:
+  git lfs install
+  git lfs track "*.pkl"
+  git lfs track "data/models/*"
+  git add .gitattributes
+  git commit -m "Add Git LFS for large models"
+
+Problem: Too many files excluded
+Solution:
+- Review .gitignore
+- To include specific .md file: Add !filename.md in .gitignore
+- To include specific .csv file: Add !filename.csv in .gitignore
+
+Problem: index.html not rendering properly
+Solution:
+- Use GitHub Pages (see step 6 above)
+- Or download and open locally
+- Or use GitHub's built-in HTML preview
+
+Problem: Can't push (too large)
+Solution:
+- Check what's staged: git ls-files -s
+- Remove large files from history: git filter-branch or BFG Repo-Cleaner
+- Verify .gitignore is working
+
+REPOSITORY MAINTENANCE
+----------------------
+
+Adding new files:
+- Code files (.py): Will be tracked automatically
+- New models: Will be tracked (data/models/ no longer excluded)
+- Documentation (.md): Will be excluded by default
+- Data (.csv): Will be excluded by default
+
+Updating documentation:
+- Edit index.html for main documentation
+- Edit README.md for landing page
+- Keep CLAUDE.md for development reference (optional)
+
+NEXT STEPS
+----------
+1. ✅ Review this guide
+2. ✅ Update GitHub repository name
+3. ✅ Follow deployment steps 1-5
+4. ✅ Setup GitHub Pages (step 6, optional)
+5. ✅ Update repository settings (step 7)
+6. ✅ Verify deployment
+7. ✅ Share repository link
+
+ADDITIONAL RESOURCES
+--------------------
+- GitHub Pages docs: https://pages.github.com/
+- Git LFS: https://git-lfs.github.com/
+- GitHub file size limits: https://docs.github.com/en/repositories/working-with-files/managing-large-files
+
+================================================================================
+  Deployment guide created: November 2025
+  Project: GR Cup Racing Analytics
+  Status: Production Ready
+================================================================================

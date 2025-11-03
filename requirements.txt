@@ -1,0 +1,120 @@
+# GR Cup Racing Analytics Platform - Python Dependencies
+# Plan C Implementation Requirements
+
+# ============================================================
+# CORE DATA PROCESSING
+# ============================================================
+pandas>=1.5.0
+numpy>=1.23.0
+polars>=0.18.0           # High-performance alternative to pandas
+pyarrow>=12.0.0          # Parquet format support
+scipy>=1.10.0            # Statistical analysis
+
+# ============================================================
+# MACHINE LEARNING - BASELINE MODELS
+# ============================================================
+scikit-learn>=1.2.0
+lightgbm>=3.3.0          # Primary baseline model (R²=0.999 in F1 research)
+xgboost>=1.7.0           # Ensemble member
+catboost>=1.1.0          # Categorical data handling
+
+# ============================================================
+# DEEP LEARNING - ADVANCED MODELS
+# ============================================================
+torch>=2.0.0             # PyTorch for LSTM, PINN, TabNet
+torchvision>=0.15.0
+torchaudio>=2.0.0
+tensorflow>=2.12.0       # Alternative DL framework (optional)
+
+# ============================================================
+# EXPLAINABILITY & ANALYSIS
+# ============================================================
+shap>=0.41.0             # SHAP explainability for driver coaching
+lime>=0.2.0              # Alternative explainability method
+dtaidistance>=2.3.0      # Dynamic Time Warping for lap comparison
+statsmodels>=0.14.0      # Granger causality, time-series analysis
+dowhy>=0.9.0             # Causal inference framework
+
+# ============================================================
+# OPTIMIZATION & HYPERPARAMETER TUNING
+# ============================================================
+optuna>=3.2.0            # Hyperparameter optimization
+deap>=1.3.0              # Genetic algorithms for setup optimization
+hyperopt>=0.2.7          # Bayesian optimization
+
+# ============================================================
+# VISUALIZATION
+# ============================================================
+matplotlib>=3.6.0
+seaborn>=0.12.0
+plotly>=5.14.0           # Interactive dashboards
+dash>=2.9.0              # Web dashboard framework
+bokeh>=3.1.0             # Alternative interactive viz
+
+# ============================================================
+# WEB FRAMEWORK & API
+# ============================================================
+fastapi>=0.95.0          # REST API (high performance)
+uvicorn>=0.21.0          # ASGI server for FastAPI
+python-multipart>=0.0.6  # File upload support for FastAPI
+flask>=2.3.0             # Alternative web framework
+pydantic>=1.10.0         # Data validation for API
+
+# ============================================================
+# DATABASE & STORAGE
+# ============================================================
+sqlalchemy>=2.0.0        # Database ORM
+psycopg2-binary>=2.9.0   # PostgreSQL driver
+
+# ============================================================
+# MODEL MANAGEMENT
+# ============================================================
+mlflow>=2.3.0            # Model registry + experiment tracking
+joblib>=1.2.0            # Model serialization
+
+# ============================================================
+# UTILITIES
+# ============================================================
+tqdm>=4.65.0             # Progress bars
+python-dotenv>=1.0.0     # Environment variable management
+pyyaml>=6.0              # Configuration files
+click>=8.1.0             # CLI tool creation
+loguru>=0.7.0            # Logging
+
+# ============================================================
+# TESTING & QUALITY
+# ============================================================
+pytest>=7.3.0
+pytest-cov>=4.0.0
+black>=23.3.0            # Code formatting
+flake8>=6.0.0            # Linting
+mypy>=1.2.0              # Type checking
+
+# ============================================================
+# JUPYTER & NOTEBOOKS
+# ============================================================
+jupyter>=1.0.0
+ipykernel>=6.22.0
+notebook>=6.5.0
+
+# ============================================================
+# REPORTING & DOCUMENTATION
+# ============================================================
+reportlab>=4.0.0         # PDF report generation
+fpdf2>=2.7.0             # Alternative PDF library
+markdown>=3.4.0          # Markdown processing
+jinja2>=3.1.0            # Template engine
+
+# ============================================================
+# DEPLOYMENT & MONITORING
+# ============================================================
+prometheus-client>=0.16.0 # Metrics collection
+gunicorn>=20.1.0         # Production WSGI server
+
+# ============================================================
+# OPTIONAL: ADVANCED FEATURES
+# ============================================================
+# opencv-python>=4.7.0   # Video processing (for telemetry + video overlay)
+# gpflow>=2.6.0          # Gaussian processes (alternative modeling)
+# pytorch-lightning>=2.0.0 # High-level PyTorch wrapper
+# ray[tune]>=2.4.0       # Distributed hyperparameter tuning

@@ -1,0 +1,268 @@
+================================================================================
+RACING DASHBOARD - DEPLOYMENT QUICK REFERENCE
+================================================================================
+
+SERVER DETAILS
+--------------
+IP:         200.58.107.214
+SSH Port:   5197
+Username:   tactical
+Directory:  /home/tactical/racing-dashboard
+Dashboard:  http://200.58.107.214
+API:        http://200.58.107.214/api
+
+
+WINDOWS - DEPLOYMENT COMMANDS
+------------------------------
+
+Full Deployment:
+    cd C:\project\data_analisys_car\deployment
+    .\deploy_to_server.ps1
+
+Audit Only:
+    .\deploy_to_server.ps1 -Phase audit
+
+Upload Only:
+    .\deploy_to_server.ps1 -Phase upload
+
+Deploy Only:
+    .\deploy_to_server.ps1 -Phase deploy
+
+Interactive Guide:
+    deploy_windows.bat
+
+
+SSH CONNECTION
+--------------
+    ssh -p 5197 tactical@200.58.107.214
+
+
+FILE UPLOAD (SCP)
+-----------------
+Upload audit script:
+    scp -P 5197 deployment\01_audit_server.sh tactical@200.58.107.214:/tmp/
+
+Upload deployment script:
+    scp -P 5197 deployment\02_deploy_dashboard.sh tactical@200.58.107.214:/home/tactical/racing-dashboard/deploy.sh
+
+Upload project files:
+    scp -P 5197 -r src requirements.txt data_loader.py tactical@200.58.107.214:/home/tactical/racing-dashboard/
+
+
+ON SERVER - SERVICE MANAGEMENT
+-------------------------------
+
+Check Service Status:
+    sudo systemctl status racing-api
+    sudo systemctl status racing-dashboard
+    sudo systemctl status nginx
+
+Start Services:
+    sudo systemctl start racing-api
+    sudo systemctl start racing-dashboard
+    sudo systemctl start nginx
+
+Stop Services:
+    sudo systemctl stop racing-api
+    sudo systemctl stop racing-dashboard
+
+Restart Services:
+    sudo systemctl restart racing-api
+    sudo systemctl restart racing-dashboard
+
+Enable Auto-Start:
+    sudo systemctl enable racing-api
+    sudo systemctl enable racing-dashboard
+    sudo systemctl enable nginx
+
+
+ON SERVER - VIEW LOGS
+----------------------
+
+Real-time Dashboard Logs:
+    sudo journalctl -u racing-dashboard -f
+
+Real-time API Logs:
+    sudo journalctl -u racing-api -f
+
+Last 100 Lines:
+    sudo journalctl -u racing-dashboard -n 100
+
+Today's Logs:
+    sudo journalctl -u racing-dashboard --since today
+
+Application Log Files:
+    tail -f /home/tactical/racing-dashboard/logs/dashboard-stdout.log
+    tail -f /home/tactical/racing-dashboard/logs/dashboard-stderr.log
+    tail -f /home/tactical/racing-dashboard/logs/api-stdout.log
+
+Nginx Logs:
+    sudo tail -f /var/log/nginx/access.log
+    sudo tail -f /var/log/nginx/error.log
+
+
+ON SERVER - DIAGNOSTICS
+------------------------
+
+Check Listening Ports:
+    sudo netstat -tuln | grep -E ':(80|8050|8000)'
+    sudo ss -tuln | grep -E ':(80|8050|8000)'
+
+Check System Resources:
+    free -h                    # Memory usage
+    df -h                      # Disk usage
+    top                        # CPU and processes
+    htop                       # Better process viewer (if installed)
+
+Check Python Environment:
+    cd /home/tactical/racing-dashboard
+    source venv/bin/activate
+    python --version
+    pip list | grep -i dash
+
+Test Dashboard Locally:
+    curl http://localhost:8050
+
+Test API Locally:
+    curl http://localhost:8000
+
+Test via Nginx:
+    curl http://200.58.107.214
+
+
+ON SERVER - CONFIGURATION FILES
+--------------------------------
+
+Dashboard Service:
+    /etc/systemd/system/racing-dashboard.service
+
+API Service:
+    /etc/systemd/system/racing-api.service
+
+Nginx Configuration:
+    /etc/nginx/sites-available/racing-dashboard
+    /etc/nginx/sites-enabled/racing-dashboard
+
+Environment Variables:
+    /home/tactical/racing-dashboard/.env
+
+Application Directory:
+    /home/tactical/racing-dashboard/
+
+
+ON SERVER - COMMON FIXES
+-------------------------
+
+Restart Everything:
+    sudo systemctl restart racing-api racing-dashboard nginx
+
+Reload Configuration (after editing service files):
+    sudo systemctl daemon-reload
+    sudo systemctl restart racing-api racing-dashboard
+
+Test Nginx Configuration:
+    sudo nginx -t
+    sudo systemctl reload nginx
+
+Fix Permissions:
+    sudo chown -R tactical:tactical /home/tactical/racing-dashboard
+    sudo chmod -R 755 /home/tactical/racing-dashboard
+
+Reinstall Python Dependencies:
+    cd /home/tactical/racing-dashboard
+    source venv/bin/activate
+    pip install -r requirements.txt --upgrade
+    sudo systemctl restart racing-api racing-dashboard
+
+Clear Python Cache:
+    cd /home/tactical/racing-dashboard
+    find . -type d -name "__pycache__" -exec rm -r {} +
+    sudo systemctl restart racing-api racing-dashboard
+
+
+ON SERVER - FIREWALL
+---------------------
+
+Check Firewall Status:
+    sudo ufw status
+
+Allow HTTP/HTTPS:
+    sudo ufw allow 80/tcp
+    sudo ufw allow 443/tcp
+
+Check Firewalld (CentOS/RHEL):
+    sudo firewall-cmd --list-all
+
+
+ON SERVER - UPDATE CODE
+------------------------
+
+1. Upload new files via SCP or WinSCP
+2. Restart services:
+    sudo systemctl restart racing-api racing-dashboard
+
+3. If dependencies changed:
+    cd /home/tactical/racing-dashboard
+    source venv/bin/activate
+    pip install -r requirements.txt
+    sudo systemctl restart racing-api racing-dashboard
+
+
+EMERGENCY PROCEDURES
+--------------------
+
+Dashboard Not Accessible:
+    1. ssh -p 5197 tactical@200.58.107.214
+    2. sudo systemctl status racing-dashboard nginx
+    3. sudo journalctl -u racing-dashboard -n 100
+    4. sudo systemctl restart racing-dashboard nginx
+
+Service Won't Start:
+    1. Check logs: sudo journalctl -u racing-dashboard -n 100
+    2. Test manually:
+        cd /home/tactical/racing-dashboard
+        source venv/bin/activate
+        python src/dashboard/app.py
+    3. Check for port conflicts:
+        sudo netstat -tuln | grep 8050
+
+Out of Memory:
+    1. free -h
+    2. sudo systemctl restart racing-api racing-dashboard
+    3. Reduce API workers in /etc/systemd/system/racing-api.service
+
+Server Unresponsive:
+    1. Contact hosting provider
+    2. Reboot server (last resort)
+
+
+TESTING CHECKLIST
+-----------------
+[ ] ssh -p 5197 tactical@200.58.107.214 (connection works)
+[ ] sudo systemctl status racing-api racing-dashboard (all active)
+[ ] curl http://localhost:8050 (dashboard responds)
+[ ] Open http://200.58.107.214 in browser (upload page loads)
+[ ] Upload master_racing_data.csv (upload succeeds)
+[ ] Model Predictions tab active (tab 3 opens first)
+[ ] Features display correctly (categories, patterns, corners)
+[ ] No errors in logs: sudo journalctl -u racing-dashboard -n 50
+
+
+DOCUMENTATION
+-------------
+Full Guide:     deployment/DEPLOYMENT_PLAN.md
+README:         deployment/README.md
+Architecture:   CLAUDE.md
+Project Docs:   README.md
+
+
+SUPPORT CONTACTS
+----------------
+Deployment Issues:  See DEPLOYMENT_PLAN.md → Troubleshooting
+Server Access:      Contact server administrator
+Application Bugs:   Check logs, review CLAUDE.md
+
+
+================================================================================
+Quick Reference Version: 1.0 | Created: 2025-11-02
+================================================================================

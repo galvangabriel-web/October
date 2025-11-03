@@ -1,0 +1,185 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    DASHBOARD BUG FIXES - QUICK GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+Two bugs fixed:
+1. SSH Password Automation ✅ DONE
+2. Dashboard Upload Detection 📋 INSTRUCTIONS BELOW
+
+═══════════════════════════════════════════════════════════════════════════════
+                        BUG #1: SSH AUTOMATION ✅
+═══════════════════════════════════════════════════════════════════════════════
+
+SOLUTION: SSH config created. Use this instead:
+
+    ssh racing-server
+
+Password: 1253*1253*Win1 (only ask once now)
+
+Helper script also available:
+    deployment\ssh_helper.bat
+
+═══════════════════════════════════════════════════════════════════════════════
+                  BUG #2: DASHBOARD UPLOAD NOT WORKING
+═══════════════════════════════════════════════════════════════════════════════
+
+PROBLEM:
+The upload callback looks for column "vehicle_number" but your CSV might have:
+- "Vehicle"
+- "VehicleNumber"
+- "car"
+- Or other variations
+
+DIAGNOSIS STEPS:
+
+1. Check what columns your CSV has:
+   Open your CSV in Excel/Notepad and look at the first row (headers)
+
+2. Check dashboard logs to see the actual error:
+
+   ssh racing-server
+   tail -100 /home/tactical/racing-dashboard/logs/dashboard-stderr.log
+
+3. Look for lines like:
+   "Uploaded file columns: ['Vehicle', 'lap', 'time', ...]"
+
+═══════════════════════════════════════════════════════════════════════════════
+                            QUICK FIX OPTIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+OPTION A: Rename Your CSV Column (Easiest)
+------------------------------------------
+
+1. Open your CSV file
+2. Change the first row column name to "vehicle_number"
+3. Save and re-upload
+
+Example:
+   BEFORE: Vehicle,lap,time,speed
+   AFTER:  vehicle_number,lap,time,speed
+
+
+OPTION B: Test With Sample File
+--------------------------------
+
+Create a test file "test.csv":
+
+vehicle_number,lap,time,speed
+2,1,0.0,100.5
+2,1,0.1,105.2
+5,1,0.0,98.3
+5,1,0.1,102.1
+
+Upload this to verify the dashboard works.
+
+
+OPTION C: Fix Dashboard Code (Advanced)
+---------------------------------------
+
+If you need to support multiple column names:
+
+1. SSH to server:
+   ssh racing-server
+
+2. Edit the dashboard code:
+   cd /home/tactical/racing-dashboard
+   nano src/dashboard/app.py
+
+3. Find line ~626 (search for "vehicle_number"):
+   vehicles = sorted(df['vehicle_number'].unique()) if 'vehicle_number' in df.columns else []
+
+4. Replace with this flexible version:
+
+   # Find vehicle column with multiple possible names
+   vehicle_col = None
+   for col in ['vehicle_number', 'Vehicle', 'VehicleNumber', 'car', 'Car', 'CarNumber']:
+       if col in df.columns:
+           vehicle_col = col
+           break
+
+   vehicles = sorted(df[vehicle_col].unique()) if vehicle_col else []
+
+5. Save (Ctrl+X, Y, Enter)
+
+6. Restart dashboard:
+   sudo systemctl restart racing-dashboard
+
+7. Test upload again
+
+═══════════════════════════════════════════════════════════════════════════════
+                           VERIFY THE FIX
+═══════════════════════════════════════════════════════════════════════════════
+
+After applying the fix:
+
+1. Open: http://200.58.107.214
+
+2. Upload your CSV file
+
+3. You should see:
+   ✓ Success message with file name
+   ✓ Vehicle dropdown populated
+   ✓ Can select a vehicle
+   ✓ "Analyze Performance" button enabled
+
+4. If still not working:
+   - Check logs: ssh racing-server 'sudo journalctl -u racing-dashboard -n 50'
+   - Check browser console (F12 → Console tab)
+   - Verify CSV has correct columns
+
+═══════════════════════════════════════════════════════════════════════════════
+                        COMMON CSV COLUMN NAMES
+═══════════════════════════════════════════════════════════════════════════════
+
+Required columns for full functionality:
+
+✓ vehicle_number (or Vehicle, Car, etc.) - REQUIRED for vehicle selection
+  lap (or Lap) - For lap counting
+  time (or Time, timestamp) - For time series
+  speed - For speed analysis
+  telemetry_name - For multi-sensor data
+  telemetry_value - For sensor readings
+
+Minimal working CSV:
+
+vehicle_number,lap,time,speed
+2,1,0.0,100
+2,1,0.1,105
+5,1,0.0,98
+
+═══════════════════════════════════════════════════════════════════════════════
+                           TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+If upload still fails:
+
+1. CHECK FILE SIZE:
+   Max 50MB due to 3GB RAM server limitation
+   Larger files will crash the server
+
+2. CHECK MEMORY:
+   ssh racing-server 'free -h'
+
+   If memory full, restart:
+   ssh racing-server 'sudo systemctl restart racing-dashboard'
+
+3. CHECK CSV FORMAT:
+   - Use UTF-8 encoding
+   - Use commas as delimiters
+   - No special characters in column names
+   - First row must be headers
+
+4. VIEW REAL-TIME LOGS:
+   ssh racing-server
+   sudo journalctl -u racing-dashboard -f
+   (Then upload file and watch for errors)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+NEED MORE HELP?
+
+Check detailed documentation:
+- deployment/BUG_FIXES_DASHBOARD.md
+- deployment/DEPLOYMENT_STATUS_FINAL.md
+
+═══════════════════════════════════════════════════════════════════════════════

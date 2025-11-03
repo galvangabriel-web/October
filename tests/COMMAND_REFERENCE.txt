@@ -1,0 +1,193 @@
+================================================================================
+              Drag & Drop Testing - Command Reference Card
+================================================================================
+
+QUICK START
+-----------
+Terminal 1:
+  python src/dashboard/app.py
+
+Terminal 2:
+  cd tests
+  run_drag_drop_tests.bat
+
+================================================================================
+
+PRE-FLIGHT CHECK
+----------------
+Verify all prerequisites are met:
+  cd tests
+  verify_test_setup.bat
+
+================================================================================
+
+RUN TESTS (3 Methods)
+---------------------
+Method 1 (Batch Script - Recommended):
+  cd tests
+  run_drag_drop_tests.bat
+
+Method 2 (Direct Node):
+  cd tests
+  node test_drag_drop_automated.js
+
+Method 3 (npm Script):
+  npm run test:drag-drop
+
+================================================================================
+
+VIEW RESULTS
+------------
+HTML Report (auto-opens after batch script):
+  tests/test_report_drag_drop.html
+
+JSON Results:
+  type tests\test_results_drag_drop.json
+
+Screenshots:
+  dir tests\screenshots
+
+================================================================================
+
+TROUBLESHOOTING
+---------------
+Check Node.js:
+  node --version
+  npm --version
+
+Check Puppeteer:
+  npm list puppeteer
+
+Install Puppeteer:
+  npm install
+
+Check Dashboard:
+  curl http://localhost:8050
+
+Start Dashboard:
+  python src/dashboard/app.py
+
+Install Chromium manually:
+  npx puppeteer browsers install chrome
+
+================================================================================
+
+CONFIGURATION
+-------------
+Edit: tests/test_drag_drop_automated.js
+
+const CONFIG = {
+  dashboardUrl: 'http://localhost:8050',
+  testFilePath: 'C:\\project\\..\\master_racing_data.csv',
+  headless: false,    // true for CI/CD
+  slowMo: 100         // 0 for full speed
+};
+
+================================================================================
+
+DOCUMENTATION
+-------------
+Quick Start:
+  tests/QUICK_START_DRAG_DROP_TESTING.md
+
+Comprehensive Guide:
+  tests/README_DRAG_DROP_TESTING.md
+
+Executive Summary:
+  tests/TEST_EXECUTION_SUMMARY.md
+
+Navigation:
+  tests/INDEX.md
+
+This Reference:
+  tests/COMMAND_REFERENCE.txt
+
+================================================================================
+
+FILE LOCATIONS
+--------------
+Test script:    tests/test_drag_drop_automated.js
+Test runner:    tests/run_drag_drop_tests.bat
+Setup check:    tests/verify_test_setup.bat
+HTML report:    tests/test_report_drag_drop.html (generated)
+JSON results:   tests/test_results_drag_drop.json (generated)
+Screenshots:    tests/screenshots/ (generated)
+Test data:      master_racing_data.csv
+
+================================================================================
+
+EXPECTED RESULTS
+----------------
+Passed: 9
+Failed: 0
+Screenshots: 9+
+Pass Rate: 100.00%
+
+================================================================================
+
+TEST COVERAGE
+-------------
+✓ Page load verification
+✓ Upload panel exists
+✓ Panel expansion (click)
+✓ File upload (direct input API)
+✓ Drag event UI behavior
+✓ Auto-expand on drag
+✓ Event handler logic
+
+✗ OS-level drag from Explorer (browser security limitation)
+
+================================================================================
+
+CI/CD INTEGRATION
+-----------------
+Set headless mode:
+  Edit test_drag_drop_automated.js:
+  CONFIG.headless = true
+
+Run tests:
+  npm run test:drag-drop
+
+Parse results:
+  type tests\test_results_drag_drop.json
+
+================================================================================
+
+USEFUL COMMANDS
+---------------
+Clean screenshots:
+  rmdir /s /q tests\screenshots
+
+Update Puppeteer:
+  npm install puppeteer@latest
+
+Check test file size:
+  dir tests\test_drag_drop_automated.js
+
+View HTML report:
+  start tests\test_report_drag_drop.html
+
+================================================================================
+
+PERFORMANCE
+-----------
+Visual Mode:   45-60 seconds
+Headless Mode: 20-30 seconds
+Memory:        ~200-300 MB
+Screenshots:   ~2-5 MB total
+
+================================================================================
+
+SUPPORT
+-------
+Puppeteer Docs:  https://pptr.dev/
+Dash Testing:    https://dash.plotly.com/testing
+Node.js:         https://nodejs.org/
+Drag & Drop API: https://developer.mozilla.org/docs/Web/API/HTML_Drag_and_Drop_API
+
+================================================================================
+
+Status: READY TO USE
+Run: tests\run_drag_drop_tests.bat
+
+================================================================================
