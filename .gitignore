@@ -24,9 +24,10 @@ data/processed/
 *.pkl
 *.joblib
 
-# Documentation (exclude all markdown except index.html)
+# Documentation (exclude all markdown except key files)
 *.md
 !README.md
+!CLAUDE.md
 # Keep index.html for GitHub Pages
 !index.html
 
