@@ -84,11 +84,19 @@ Racing telemetry analysis for GR Cup competition. Processes 18.5GB of profession
 ## Quick Reference
 
 ```bash
+# SSH to production server - NEVER use raw SSH, use automation!
+python ssh_helper.py "command"                  # ✅ Reads .env, no password prompt
+ssh tactical@200.58.107.214                     # ❌ Will ask for password!
+
+# Deploy to production
+python quick_upload_app.py                      # ✅ Deploy app.py changes
+python deploy_insights.py                       # ✅ Deploy src/insights changes
+
 # Most common mistake - ALWAYS use -m flag for src/ modules
 python -m src.models.baseline.train_lightgbm    # ✅ Correct
 python src/models/baseline/train_lightgbm.py    # ❌ Wrong
 
-# Start dashboard
+# Start dashboard (local development)
 python src/dashboard/app.py                     # http://localhost:8050
 
 # Load data correctly (filter by sensor BEFORE analyzing)
@@ -99,13 +107,53 @@ avg_speed = speed_data['telemetry_value'].mean()
 pytest tests/ -v
 ```
 
-## SSH Automation & Production Deployment
+## 🔐 SSH Automation & Production Deployment
 
 **CRITICAL CONTEXT:** The dashboard is LIVE on production (http://200.58.107.214:8050). All user-reported issues are about THIS SERVER!
 
-**IMPORTANT:** I'll use .env file for SSH automation - DO NOT ask for SSH passwords!
+### ⚠️ CRITICAL: SSH Password Policy
 
-The project uses automated SSH deployment via `.env` file credentials. All SSH operations should use the provided automation scripts:
+**NEVER ask the user for SSH passwords! ALL credentials are in `.env` file.**
+
+**❌ DO NOT USE these commands (they will prompt for password):**
+```bash
+ssh tactical@200.58.107.214          # ❌ Will ask for password
+scp file.py tactical@...             # ❌ Will ask for password
+git push/pull via SSH                # ❌ Will ask for password
+```
+
+**✅ ALWAYS USE Python automation scripts instead:**
+```bash
+# For running SSH commands
+python ssh_helper.py "ls -la"                    # ✅ Uses .env credentials
+venv/Scripts/python.exe ssh_helper.py "command"  # ✅ Full path version
+
+# For deploying files
+python quick_upload_app.py                       # ✅ Deploy single file
+python deploy_insights.py                        # ✅ Deploy src/insights
+```
+
+**Why Git Bash asks for password:**
+- Git for Windows uses its own SSH client, which doesn't read `.env`
+- The `.env` file is ONLY used by our Python scripts
+- Use `ssh_helper.py` for ALL SSH operations to avoid password prompts
+
+### Production Server Credentials
+
+**Location:** All credentials are in `.env` file at project root
+
+```bash
+# Production Linux Server (DO NOT ask user for these!)
+SSH_HOST=200.58.107.214
+SSH_PORT=5197
+SSH_USER=tactical
+SSH_PASSWORD=[automatically read from .env by Python scripts]
+DEPLOY_PATH=/home/tactical/racing_analytics
+
+# URLs
+Dashboard: http://200.58.107.214:8050
+API: http://200.58.107.214:8000
+```
 
 ### Workflow for Fixing Production Issues
 
@@ -113,45 +161,84 @@ The project uses automated SSH deployment via `.env` file credentials. All SSH o
 2. **Reproduce locally** (if possible) - Test on Windows development
 3. **Fix the code** - Make changes in local codebase
 4. **Test locally** - Verify fix works on http://localhost:8050
-5. **Deploy to production** - Use SSH automation scripts below
+5. **Deploy to production** - Use Python automation scripts below
 6. **Verify on production** - Check http://200.58.107.214:8050
 7. **Confirm with user** - "The fix has been deployed to production"
 
-### SSH Configuration (.env file)
+### SSH Helper Script (ssh_helper.py)
+
+**This is THE tool for all SSH operations. Use it instead of raw SSH commands.**
+
 ```bash
-SSH_HOST=200.58.107.214
-SSH_PORT=5197
-SSH_USER=tactical
-SSH_PASSWORD=[stored in .env]
-DEPLOY_PATH=/home/tactical/racing_analytics
-```
+# Run any SSH command (reads .env automatically)
+python ssh_helper.py "ps aux | grep python"
+python ssh_helper.py "tail -30 /home/tactical/racing_analytics/api.log"
+python ssh_helper.py "cd /home/tactical/racing_analytics && ls -la"
 
-### Automated Deployment Scripts
-```bash
-# Quick single-file upload (uses paramiko + .env)
-python quick_upload_app.py
-
-# Full deployment (uses paramiko + .env)
-python deployment/deploy.py
-
-# SSH helper for diagnostics (uses subprocess + .env)
+# Full diagnostic (checks dashboard, API, ports, firewall)
 python ssh_helper.py
+
+# Examples from this session:
+python ssh_helper.py "netstat -tlnp | grep 8000"  # Check if API port is open
+python ssh_helper.py "pkill -f uvicorn"           # Kill API process
 ```
 
-**Key Points:**
-- All deployment scripts read credentials from `.env` automatically
-- Use `paramiko` library for Python-based SSH/SFTP operations
-- Never prompt for passwords - credentials are in `.env`
-- Production server: `http://200.58.107.214:8050`
+### Deployment Scripts
 
-### Manual SSH Access (if needed)
 ```bash
-# Direct SSH connection
-ssh -p 5197 tactical@200.58.107.214
+# Quick single-file upload (e.g., after fixing app.py)
+python quick_upload_app.py
+# - Uploads src/dashboard/app.py
+# - Restarts dashboard automatically
+# - Verifies it's running
 
-# SCP file upload
-scp -P 5197 file.py tactical@200.58.107.214:/path/to/destination
+# Deploy entire src/insights directory
+python deploy_insights.py
+# - Uploads all 13 Python files in src/insights/
+# - Clears Python cache files
+# - Restarts API automatically
+# - Verifies API is running on port 8000
+
+# Full deployment (if deployment/deploy.py exists)
+python deployment/deploy.py
 ```
+
+### Common SSH Operations
+
+```bash
+# Check dashboard status
+python ssh_helper.py "ps aux | grep dashboard"
+
+# Check API status
+python ssh_helper.py "ps aux | grep uvicorn"
+
+# View logs
+python ssh_helper.py "tail -50 /home/tactical/racing_analytics/api.log"
+python ssh_helper.py "tail -50 /home/tactical/racing_analytics/dashboard.log"
+
+# Check listening ports
+python ssh_helper.py "netstat -tlnp | grep -E '(8000|8050)'"
+
+# Restart services
+python ssh_helper.py "pkill -f dashboard && cd /home/tactical/racing_analytics && nohup venv/bin/python src/dashboard/app.py > dashboard.log 2>&1 &"
+
+# Clear Python cache (important after deploying new .py files!)
+python ssh_helper.py "cd /home/tactical/racing_analytics && find src -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true"
+```
+
+### Troubleshooting SSH Issues
+
+**Problem: "Git Bash keeps asking for SSH password"**
+- **Solution:** Don't use Git Bash SSH! Use `python ssh_helper.py "command"` instead
+- Git Bash doesn't know about `.env` file
+- Only Python scripts with `python-dotenv` can read `.env`
+
+**Problem: "ssh command not working"**
+- **Solution:** Use `venv/Scripts/python.exe ssh_helper.py "command"`
+- Make sure you're in project root: `C:\project\data_analisys_car`
+
+**Problem: "paramiko module not found"**
+- **Solution:** Install dependencies: `pip install paramiko python-dotenv`
 
 ## Tour System & Auto-Load Features
 
