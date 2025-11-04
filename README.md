@@ -9,6 +9,19 @@
 
 ---
 
+## 🚀 Live Production Dashboard
+
+**Access the live dashboard now:** **[http://200.58.107.214:8050](http://200.58.107.214:8050)**
+
+- ✅ **10-tab interactive analytics** - Real-time telemetry analysis, pattern detection, corner analysis
+- ✅ **Auto-loaded data** - 71,000 telemetry samples from 5 vehicles, 10 laps pre-loaded
+- ✅ **AI-powered insights** - Pattern analysis, track intelligence, driver profiling
+- ✅ **Production-ready API** - FastAPI backend at [http://200.58.107.214:8000](http://200.58.107.214:8000)
+
+*Open the link above to start exploring racing analytics immediately - no installation required!*
+
+---
+
 ## 📋 Executive Summary
 
 ### Breakthrough Achievement: 97.49% R² Accuracy
@@ -127,7 +140,7 @@ This project delivers a **production-ready racing telemetry analysis system** co
 ### Real-Time Prediction API (FastAPI)
 
 ```python
-POST http://your-server:8000/predict-lap-time
+POST http://200.58.107.214:8000/predict-lap-time
 
 Request:
 {
@@ -352,10 +365,10 @@ Response:
 
 ```bash
 # Edit .env file
-SSH_HOST=your.server.ip
-SSH_USER=your_username
+SSH_HOST=200.58.107.214        # Production server IP
+SSH_USER=tactical               # Your username
 SSH_PASSWORD=your_password
-DEPLOY_PATH=/home/your_username/racing_analytics
+DEPLOY_PATH=/home/tactical/racing_analytics
 ```
 
 #### Step 2: Run Deployment
@@ -372,13 +385,14 @@ cd deployment && ./deploy_full_capabilities.sh
 
 ```bash
 # SSH to server
-ssh your_username@your_server_ip
-cd /home/your_username/racing_analytics
+ssh tactical@200.58.107.214
+cd /home/tactical/racing_analytics
 
 # Start dashboard and API
 ./start_all.sh
 
-# Access: http://your_server_ip:8050
+# Access production dashboard: http://200.58.107.214:8050
+# Access production API: http://200.58.107.214:8000
 ```
 
 ### Automated Deployment Features
@@ -494,7 +508,7 @@ telemetry_data = {
 
 # Make prediction request
 response = requests.post(
-    "http://your-server:8000/predict-lap-time",
+    "http://200.58.107.214:8000/predict-lap-time",
     json=telemetry_data
 )
 
