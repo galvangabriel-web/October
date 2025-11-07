@@ -54,6 +54,73 @@ except ImportError as e:
     ENHANCED_INSIGHTS_ENABLED = False
     logger.warning(f"Week 1 widgets not available: {e}")
 
+# Import tour components (separate from Week 1 to avoid dependency issues)
+try:
+    from src.dashboard.tour import create_welcome_modal
+    TOUR_ENABLED = True
+    logger.info("Tour system loaded successfully")
+except ImportError as e:
+    TOUR_ENABLED = False
+    logger.warning(f"Tour system not available: {e}")
+    # Create dummy function if tour is not available
+    def create_welcome_modal():
+        return html.Div()
+
+# Import help documentation system
+try:
+    from src.dashboard.help_documentation import (
+        create_help_button,
+        create_help_documentation_modal,
+        create_help_callbacks
+    )
+    HELP_ENABLED = True
+    logger.info("Help documentation system loaded successfully")
+except ImportError as e:
+    HELP_ENABLED = False
+    logger.warning(f"Help documentation system not available: {e}")
+    # Create dummy functions if help is not available
+    def create_help_button():
+        return html.Div()
+    def create_help_documentation_modal():
+        return html.Div()
+    def create_help_callbacks(app):
+        return app
+
+# Import chatbot widget
+print("=" * 80)
+print("DEBUG: ATTEMPTING CHATBOT IMPORT")
+print("=" * 80)
+logger.info("=" * 80)
+logger.info("DEBUG: ATTEMPTING CHATBOT IMPORT")
+logger.info("=" * 80)
+try:
+    from src.dashboard.chatbot_widget import create_chatbot_layout, create_chatbot_callbacks
+    CHATBOT_ENABLED = True
+    print("DEBUG: ✓ CHATBOT IMPORT SUCCEEDED - CHATBOT_ENABLED = True")
+    logger.info("✓ Chatbot widget loaded successfully - CHATBOT_ENABLED = True")
+except ImportError as e:
+    CHATBOT_ENABLED = False
+    print(f"DEBUG: ✗ CHATBOT IMPORT FAILED - {e}")
+    logger.warning(f"Chatbot widget not available: {e}")
+    # Create dummy functions if chatbot is not available
+    def create_chatbot_layout():
+        return html.Div()
+    def create_chatbot_callbacks(app):
+        return app
+except Exception as e:
+    CHATBOT_ENABLED = False
+    print(f"DEBUG: ✗ CHATBOT IMPORT EXCEPTION - {e}")
+    logger.error(f"Chatbot import exception: {e}")
+    # Create dummy functions if chatbot is not available
+    def create_chatbot_layout():
+        return html.Div()
+    def create_chatbot_callbacks(app):
+        return app
+
+print(f"DEBUG: FINAL CHATBOT_ENABLED STATE = {CHATBOT_ENABLED}")
+logger.info(f"DEBUG: FINAL CHATBOT_ENABLED STATE = {CHATBOT_ENABLED}")
+print("=" * 80)
+
 # Note: All data processing is done via API calls
 # No direct imports needed - dashboard communicates with API
 
@@ -61,17 +128,18 @@ except ImportError as e:
 # VERSION TRACKING
 #================================================================
 
-DASHBOARD_VERSION = "2.1.0-stacked-layout"
-VERSION_DATE = "2025-10-27"
+DASHBOARD_VERSION = "3.2.0-help-documentation"
+VERSION_DATE = "2025-11-07"
 VERSION_NOTES = """
-Version 2.1.0 - Stacked Layout with Separated Circuit Configuration (Option 2)
-- Implemented Option 2: Stacked full-width layout
-- Track map at 95% width on top (1400x900px)
-- Separated Circuit Configuration table below map
-- Beautiful Bootstrap table with all track data
-- Quick stats badge for at-a-glance reference
-- Clean separation eliminates overlap issues
-- Previous version: 2.0.0-footer-layout (commit 6752b54)
+Version 3.2.0 - Help Documentation System
+- Comprehensive help guide for all 10 dashboard tabs
+- Detailed explanations of purpose and data interpretation
+- Special documentation for Post-Race Analysis variables
+- Advanced Model Predictions tab documentation
+- Vehicle selection requirement notices
+- Floating help button with modal documentation
+- Tab-specific technical insights and metrics
+- Previous version: 3.1.0-tour-system-mvp
 """
 
 #================================================================
@@ -81,8 +149,22 @@ Version 2.1.0 - Stacked Layout with Separated Circuit Configuration (Option 2)
 API_BASE = "http://localhost:8000"
 COLORS = px.colors.qualitative.Set2
 
+# Production mode: Auto-load data from server path
+PRODUCTION_MODE = True
+DATA_FILE_PATH = "/home/tactical/racing_analytics/data/master_racing_data.csv"
+
 # Global cache for corner analyses (Sprint 2 Task 5)
 _cached_corner_analyses = None
+
+# Global storage for auto-loaded data
+_auto_loaded_data = None
+_auto_loaded_stats = {
+    'num_samples': 0,
+    'vehicle_options': [],
+    'num_vehicles': 0,
+    'num_laps': 0,
+    'avg_time': '--'
+}
 
 # Initialize Dash app with Bootstrap theme
 app = dash.Dash(
@@ -102,6 +184,90 @@ if WEEK1_ENABLED:
     except Exception as e:
         logger.error(f"Failed to initialize Week 1 loaders: {e}")
         WEEK1_ENABLED = False
+
+#================================================================
+# AUTO-LOAD DATA FUNCTION (Production Mode)
+#================================================================
+
+def load_data_on_startup():
+    """
+    Load data from server path on dashboard startup (Production Mode).
+
+    This function:
+    1. Checks if data file exists at DATA_FILE_PATH
+    2. Loads CSV into memory
+    3. Calculates statistics
+    4. Populates global variables for dashboard
+
+    Returns:
+        bool: True if data loaded successfully, False otherwise
+    """
+    global _auto_loaded_data, _auto_loaded_stats
+
+    if not PRODUCTION_MODE:
+        logger.info("Production mode disabled, skipping auto-load")
+        return False
+
+    try:
+        # Check if running on Windows (development) or Linux (production)
+        import platform
+        is_windows = platform.system() == 'Windows'
+
+        # Use local path for Windows development, server path for Linux production
+        if is_windows:
+            data_path = Path(__file__).parent.parent.parent / "master_racing_data.csv"
+            logger.info(f"[DEVELOPMENT MODE] Loading from local path: {data_path}")
+        else:
+            data_path = Path(DATA_FILE_PATH)
+            logger.info(f"[PRODUCTION MODE] Loading from server path: {data_path}")
+
+        # Check if file exists
+        if not data_path.exists():
+            logger.error(f"Data file not found: {data_path}")
+            return False
+
+        # Load CSV
+        logger.info(f"Loading telemetry data from {data_path}...")
+        df = pd.read_csv(data_path)
+        logger.info(f"✅ Loaded {len(df):,} rows from {data_path}")
+
+        # Store data as JSON
+        _auto_loaded_data = df.to_json(date_format='iso', orient='split')
+
+        # Calculate statistics
+        num_samples = len(df)
+        vehicles = sorted(df['vehicle_number'].unique()) if 'vehicle_number' in df.columns else []
+        num_vehicles = len(vehicles)
+        num_laps = df['lap'].nunique() if 'lap' in df.columns else 0
+
+        # Create vehicle dropdown options
+        vehicle_options = [{'label': f'Vehicle #{v}', 'value': v} for v in vehicles]
+
+        # Store stats
+        _auto_loaded_stats = {
+            'num_samples': num_samples,
+            'vehicle_options': vehicle_options,
+            'num_vehicles': num_vehicles,
+            'num_laps': num_laps,
+            'avg_time': '--'
+        }
+
+        logger.info(f"✅ Auto-load complete: {num_samples:,} samples, {num_vehicles} vehicles, {num_laps} laps")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to auto-load data: {e}", exc_info=True)
+        return False
+
+# Auto-load data on startup if in production mode
+if PRODUCTION_MODE:
+    logger.info("="*60)
+    logger.info("PRODUCTION MODE: Auto-loading telemetry data...")
+    logger.info("="*60)
+    if load_data_on_startup():
+        logger.info("✅ Data auto-loaded successfully")
+    else:
+        logger.warning("⚠️ Failed to auto-load data, dashboard will start empty")
 
 #================================================================
 # LAYOUT
@@ -162,7 +328,6 @@ upload_section = dbc.Card([
             multiple=False
         ),
         html.Div(id='upload-status', className="mt-3"),
-        html.Div(id='upload-data', style={'display': 'none'}),
     ])
 ], className="mb-4 shadow-sm")
 
@@ -290,7 +455,6 @@ def create_upload_page():
 
                     # Status message
                     html.Div(id='upload-status', className="mt-4"),
-                    html.Div(id='upload-data', style={'display': 'none'}),
 
                     # Hidden elements for callback compatibility
                     html.Div([
@@ -426,32 +590,67 @@ def create_dashboard_page():
 
         # Main content container - FULL WIDTH
         dbc.Container([
-            # Stats row - compact
-            dbc.Row([
-                dbc.Col(create_stat_card("Samples", html.Span(id='stat-samples', children="0"), "database", "#17a2b8"), md=3),
-                dbc.Col(create_stat_card("Vehicles", html.Span(id='stat-vehicles', children="0"), "car", "#28a745"), md=3),
-                dbc.Col(create_stat_card("Laps", html.Span(id='stat-laps', children="0"), "flag", "#ffc107"), md=3),
-                dbc.Col(create_stat_card("Avg Time", html.Span(id='stat-avg-time', children="--"), "clock", "#dc3545"), md=3),
-            ], className="mb-3"),
+            # Dashboard Stats Section - Visual Container
+            dbc.Card([
+                dbc.CardHeader([
+                    html.I(className="fas fa-tachometer-alt me-2"),
+                    "Dashboard Statistics"
+                ], style={'backgroundColor': '#f8f9fa', 'borderBottom': '2px solid #dee2e6'}),
+                dbc.CardBody([
+                    # Stats row - compact
+                    dbc.Row([
+                        dbc.Col(create_stat_card("Samples", html.Span(id='stat-samples', children="0"), "database", "#17a2b8"), md=3),
+                        dbc.Col(create_stat_card("Vehicles", html.Span(id='stat-vehicles', children="0"), "car", "#28a745"), md=3),
+                        dbc.Col(create_stat_card("Laps", html.Span(id='stat-laps', children="0"), "flag", "#ffc107"), md=3),
+                        dbc.Col(create_stat_card("Avg Time", html.Span(id='stat-avg-time', children="--"), "clock", "#dc3545"), md=3),
+                    ]),
+                ], style={'padding': '1rem'}),
+            ], className="mb-4", style={'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'}),
 
-            # FULL WIDTH TABS - Maximum space for visualizations
-            dbc.Row([
-                dbc.Col([
-                    dbc.Tabs([
-                        dbc.Tab(label="Driver Insights", tab_id="tab-insights", label_style={"cursor": "pointer"}),
-                        dbc.Tab(label="Telemetry Charts", tab_id="tab-telemetry", label_style={"cursor": "pointer"}),
-                        dbc.Tab(label="Model Predictions", tab_id="tab-predictions", label_style={"cursor": "pointer"}),
-                        dbc.Tab(label="Track Maps", tab_id="tab-track-maps", label_style={"cursor": "pointer"}),
-                        dbc.Tab(label="Weather Conditions", tab_id="tab-weather", label_style={"cursor": "pointer"}),
-                        dbc.Tab(label="Sector Benchmarking", tab_id="tab-sectors", label_style={"cursor": "pointer"}),
-                        dbc.Tab(label="Championships", tab_id="tab-championships", label_style={"cursor": "pointer"}),
-                        dbc.Tab(label="Track Animation", tab_id="tab-animation", label_style={"cursor": "pointer"}),
-                        dbc.Tab(label="Post-Race Analysis", tab_id="tab-post-race", label_style={"cursor": "pointer"}),
-                    ], id="tabs", active_tab="tab-predictions", className="mb-3"),
-                    html.Div(id="tab-content", style={'min-height': '70vh'})  # Minimum height for content
-                ], width=12),
-            ], className="mb-3"),
+            # Analysis Tabs Section - Visual Container
+            dbc.Card([
+                dbc.CardHeader([
+                    html.I(className="fas fa-chart-line me-2"),
+                    "Analysis Tools"
+                ], style={'backgroundColor': '#f8f9fa', 'borderBottom': '2px solid #dee2e6'}),
+                dbc.CardBody([
+                    # FULL WIDTH TABS - Maximum space for visualizations
+                    dbc.Row([
+                        dbc.Col([
+                            dbc.Tabs([
+                                dbc.Tab(label="Driver Insights", tab_id="tab-insights", label_style={"cursor": "pointer"}),
+                                dbc.Tab(label="Post-Race Analysis", tab_id="tab-post-race", label_style={"cursor": "pointer"}),
+                                dbc.Tab(label="Telemetry Charts", tab_id="tab-telemetry", label_style={"cursor": "pointer"}),
+                                dbc.Tab(label="Model Predictions", tab_id="tab-predictions", label_style={"cursor": "pointer"}),
+                                dbc.Tab(label="Track Maps", tab_id="tab-track-maps", label_style={"cursor": "pointer"}),
+                                dbc.Tab(label="Weather Conditions", tab_id="tab-weather", label_style={"cursor": "pointer"}),
+                                dbc.Tab(label="Sector Benchmarking", tab_id="tab-sectors", label_style={"cursor": "pointer"}),
+                                dbc.Tab(label="Championships", tab_id="tab-championships", label_style={"cursor": "pointer"}),
+                                dbc.Tab(label="Track Animation", tab_id="tab-animation", label_style={"cursor": "pointer"}),
+                            ], id="tabs", active_tab="tab-insights", className="mb-3"),
+                            html.Div(id="tab-content", style={'min-height': '70vh'})  # Minimum height for content
+                        ], width=12),
+                    ]),
+                ], style={'padding': '1.5rem'}),
+            ], className="mb-3", style={'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'}),
         ], fluid=True, style={'padding': '0 1rem'}),
+
+        # CHATBOT WIDGET - Floating panel on right side
+        html.Div([
+            html.Div([
+                create_chatbot_layout()
+            ], style={
+                'position': 'fixed',
+                'right': '20px',
+                'bottom': '220px',
+                'width': '400px',
+                'maxHeight': '600px',
+                'zIndex': '999',
+                'boxShadow': '0 4px 12px rgba(0,0,0,0.15)',
+                'borderRadius': '0.5rem',
+                'overflow': 'hidden'
+            })
+        ], id="chatbot-container"),
 
         # FOOTER - Upload and vehicle selection in compact horizontal layout
         html.Footer([
@@ -486,7 +685,6 @@ def create_dashboard_page():
                                     multiple=False
                                 ),
                                 html.Div(id='upload-status', className="mt-2", style={'fontSize': '12px'}),
-                                html.Div(id='upload-data', style={'display': 'none'}),
                             ], md=6),
 
                             # Vehicle selection - compact
@@ -546,124 +744,228 @@ def create_dashboard_page():
 
     ], style={'background': '#f0f2f5', 'min-height': '100vh', 'paddingBottom': '200px'})
 
-# Main layout with conditional rendering based on upload state
-app.layout = html.Div([
-    # Store to track page state
-    dcc.Store(id='show-dashboard', data=False),
+# Main layout - Production Mode (No Upload Page, Auto-load Only)
+if PRODUCTION_MODE:
+    # Direct dashboard layout with auto-loaded data
+    app.layout = html.Div([
+        # Store for telemetry data (populated from auto-loaded data)
+        dcc.Store(id='upload-data', data=_auto_loaded_data),
 
-    # Store to persist uploaded telemetry data across page switches
-    dcc.Store(id='upload-data'),
+        # Tour state storage
+        dcc.Store(id='tour-state', data={
+            'welcome_shown': False,
+            'tour_completed': False,
+            'dont_show_again': False
+        }),
 
-    # Page container (shows upload page initially, then switches to dashboard after upload)
-    html.Div(id='page-container', children=create_upload_page())
-])
+        # Show dashboard directly (no upload page)
+        create_dashboard_page(),
+
+        # Add tour welcome modal
+        create_welcome_modal(),
+
+        # Add help documentation system
+        create_help_button(),
+        create_help_documentation_modal(),
+
+        # CHATBOT WIDGET - Floating panel on right side
+        html.Div([
+            html.Div([
+                create_chatbot_layout()
+            ], style={
+                'position': 'fixed',
+                'right': '20px',
+                'bottom': '220px',
+                'width': '400px',
+                'maxHeight': '600px',
+                'zIndex': '999',
+                'boxShadow': '0 4px 12px rgba(0,0,0,0.15)',
+                'borderRadius': '0.5rem',
+                'overflow': 'hidden'
+            })
+        ], id="chatbot-container")
+    ])
+else:
+    # Development mode: Keep two-page flow with manual upload
+    app.layout = html.Div([
+        # Store to track page state
+        dcc.Store(id='show-dashboard', data=False),
+
+        # Store to persist uploaded telemetry data across page switches
+        dcc.Store(id='upload-data'),
+
+        # Tour state storage
+        dcc.Store(id='tour-state', data={
+            'welcome_shown': False,
+            'tour_completed': False,
+            'dont_show_again': False
+        }),
+
+        # Page container (shows upload page initially, then switches to dashboard after upload)
+        html.Div(id='page-container', children=create_upload_page()),
+
+        # Add tour welcome modal
+        create_welcome_modal(),
+
+        # Add help documentation system
+        create_help_button(),
+        create_help_documentation_modal(),
+
+        # CHATBOT WIDGET - Floating panel on right side
+        html.Div([
+            html.Div([
+                create_chatbot_layout()
+            ], style={
+                'position': 'fixed',
+                'right': '20px',
+                'bottom': '220px',
+                'width': '400px',
+                'maxHeight': '600px',
+                'zIndex': '999',
+                'boxShadow': '0 4px 12px rgba(0,0,0,0.15)',
+                'borderRadius': '0.5rem',
+                'overflow': 'hidden'
+            })
+        ], id="chatbot-container")
+    ])
 
 #================================================================
 # CALLBACKS
 #================================================================
 
-# Callback to render initial page based on show-dashboard state
-@app.callback(
-    Output('page-container', 'children'),
-    Input('show-dashboard', 'data')
-)
-def render_page(show_dashboard):
-    """Render upload page or dashboard based on state"""
-    if show_dashboard:
-        return create_dashboard_page()
-    else:
-        return create_upload_page()
+# Callback to render initial page based on show-dashboard state (Development Mode Only)
+if not PRODUCTION_MODE:
+    @app.callback(
+        Output('page-container', 'children'),
+        Input('show-dashboard', 'data')
+    )
+    def render_page(show_dashboard):
+        """Render upload page or dashboard based on state (Development Mode)"""
+        if show_dashboard:
+            return create_dashboard_page()
+        else:
+            return create_upload_page()
 
-@app.callback(
-    [Output('upload-status', 'children'),
-     Output('upload-data', 'children'),
-     Output('vehicle-dropdown', 'options'),
-     Output('stat-samples', 'children'),
-     Output('stat-vehicles', 'children'),
-     Output('stat-laps', 'children'),
-     Output('stat-avg-time', 'children'),
-     Output('analyze-button', 'disabled'),
-     Output('show-dashboard', 'data')],  # Add output to switch to dashboard
-    [Input('upload-telemetry', 'contents')],
-    [State('upload-telemetry', 'filename')]
-)
-def handle_upload(contents, filename):
-    """Handle telemetry file upload"""
-    if contents is None:
-        return ("", "", [], "0", "0", "0", "--", True, False)  # Stay on upload page
+# Callback to populate stats on page load (Production Mode)
+if PRODUCTION_MODE:
+    @app.callback(
+        [Output('vehicle-dropdown', 'options'),
+         Output('stat-samples', 'children'),
+         Output('stat-vehicles', 'children'),
+         Output('stat-laps', 'children'),
+         Output('stat-avg-time', 'children'),
+         Output('analyze-button', 'disabled')],
+        [Input('upload-data', 'data')],  # Triggers when page loads with auto-loaded data
+        prevent_initial_call=False
+    )
+    def populate_stats_on_load(data_json):
+        """Populate dashboard stats from auto-loaded data (Production Mode)"""
+        if data_json is None or not _auto_loaded_stats:
+            # No data loaded
+            return ([], "0", "0", "0", "--", True)
 
-    try:
-        # Decode uploaded file
-        content_type, content_string = contents.split(',')
-        decoded = base64.b64decode(content_string)
-
-        # Check file size (limit to 500MB for web upload)
-        file_size_mb = len(decoded) / (1024 * 1024)
-        if file_size_mb > 500:
-            error_msg = dbc.Alert([
-                html.I(className="fas fa-exclamation-triangle me-2"),
-                html.Strong("File too large! "),
-                f"({file_size_mb:.1f}MB) ",
-                html.Br(),
-                "Maximum file size for web upload is 500MB. ",
-                html.Br(),
-                html.Small("For larger files (like 2.5GB), please use one of these options:", className="d-block mt-2"),
-                html.Ul([
-                    html.Li("Use organize_and_chunk_data.py to split into smaller chunks"),
-                    html.Li("Use data_loader.py to load data directly from organized_data/"),
-                    html.Li("Sample your data first (e.g., every 10th row)")
-                ], className="small mt-1")
-            ], color="danger", className="mb-0")
-            return (error_msg, "", [], "0", "0", "0", "--", True, False)  # Stay on upload page
-
-        df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
-
-        # Store data as JSON
-        data_json = df.to_json(date_format='iso', orient='split')
-
-        # Get statistics
-        num_samples = len(df)
-        vehicles = sorted(df['vehicle_number'].unique()) if 'vehicle_number' in df.columns else []
-        num_vehicles = len(vehicles)
-        num_laps = df['lap'].nunique() if 'lap' in df.columns else 0
-
-        # Calculate average lap time if lap_times data
-        avg_time = "--"
-
-        # Create vehicle dropdown options
-        vehicle_options = [{'label': f'Vehicle #{v}', 'value': v} for v in vehicles]
-
-        # Success message
-        status_msg = dbc.Alert([
-            html.I(className="fas fa-check-circle me-2"),
-            f"Successfully loaded {filename} ({num_samples:,} samples)"
-        ], color="success", className="mb-0")
-
+        # Use pre-calculated stats from auto-load
         return (
-            status_msg,
-            data_json,
-            vehicle_options,
-            f"{num_samples:,}",
-            str(num_vehicles),
-            str(num_laps),
-            avg_time,
-            False,  # Enable analyze button
-            True    # Switch to dashboard page
+            _auto_loaded_stats['vehicle_options'],
+            f"{_auto_loaded_stats['num_samples']:,}",
+            str(_auto_loaded_stats['num_vehicles']),
+            str(_auto_loaded_stats['num_laps']),
+            _auto_loaded_stats['avg_time'],
+            False  # Enable analyze button
         )
 
-    except Exception as e:
-        error_msg = dbc.Alert([
-            html.I(className="fas fa-exclamation-triangle me-2"),
-            f"Error loading file: {str(e)}"
-        ], color="danger", className="mb-0")
-        return (error_msg, "", [], "0", "0", "0", "--", True, False)  # Stay on upload page on error
+# Upload callback (Development Mode Only - Production Mode uses auto-loaded data)
+if not PRODUCTION_MODE:
+    @app.callback(
+        [Output('upload-status', 'children'),
+         Output('upload-data', 'data'),
+         Output('vehicle-dropdown', 'options'),
+         Output('stat-samples', 'children'),
+         Output('stat-vehicles', 'children'),
+         Output('stat-laps', 'children'),
+         Output('stat-avg-time', 'children'),
+         Output('analyze-button', 'disabled'),
+         Output('show-dashboard', 'data')],  # Add output to switch to dashboard
+        [Input('upload-telemetry', 'contents')],
+        [State('upload-telemetry', 'filename')]
+    )
+    def handle_upload(contents, filename):
+        """Handle telemetry file upload (Development Mode Only)"""
+        if contents is None:
+            return ("", "", [], "0", "0", "0", "--", True, False)  # Stay on upload page
+
+        try:
+            # Decode uploaded file
+            content_type, content_string = contents.split(',')
+            decoded = base64.b64decode(content_string)
+
+            # Check file size (limit to 500MB for web upload)
+            file_size_mb = len(decoded) / (1024 * 1024)
+            if file_size_mb > 500:
+                error_msg = dbc.Alert([
+                    html.I(className="fas fa-exclamation-triangle me-2"),
+                    html.Strong("File too large! "),
+                    f"({file_size_mb:.1f}MB) ",
+                    html.Br(),
+                    "Maximum file size for web upload is 500MB. ",
+                    html.Br(),
+                    html.Small("For larger files (like 2.5GB), please use one of these options:", className="d-block mt-2"),
+                    html.Ul([
+                        html.Li("Use organize_and_chunk_data.py to split into smaller chunks"),
+                        html.Li("Use data_loader.py to load data directly from organized_data/"),
+                        html.Li("Sample your data first (e.g., every 10th row)")
+                    ], className="small mt-1")
+                ], color="danger", className="mb-0")
+                return (error_msg, "", [], "0", "0", "0", "--", True, False)  # Stay on upload page
+
+            df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+            # Store data as JSON
+            data_json = df.to_json(date_format='iso', orient='split')
+
+            # Get statistics
+            num_samples = len(df)
+            vehicles = sorted(df['vehicle_number'].unique()) if 'vehicle_number' in df.columns else []
+            num_vehicles = len(vehicles)
+            num_laps = df['lap'].nunique() if 'lap' in df.columns else 0
+
+            # Calculate average lap time if lap_times data
+            avg_time = "--"
+
+            # Create vehicle dropdown options
+            vehicle_options = [{'label': f'Vehicle #{v}', 'value': v} for v in vehicles]
+
+            # Success message
+            status_msg = dbc.Alert([
+                html.I(className="fas fa-check-circle me-2"),
+                f"Successfully loaded {filename} ({num_samples:,} samples)"
+            ], color="success", className="mb-0")
+
+            return (
+                status_msg,
+                data_json,
+                vehicle_options,
+                f"{num_samples:,}",
+                str(num_vehicles),
+                str(num_laps),
+                avg_time,
+                False,  # Enable analyze button
+                True    # Switch to dashboard page
+            )
+
+        except Exception as e:
+            error_msg = dbc.Alert([
+                html.I(className="fas fa-exclamation-triangle me-2"),
+                f"Error loading file: {str(e)}"
+            ], color="danger", className="mb-0")
+            return (error_msg, "", [], "0", "0", "0", "--", True, False)  # Stay on upload page on error
 
 @app.callback(
     Output('tab-content', 'children'),
-    [Input('tabs', 'active_tab'),
-     Input('analyze-button', 'n_clicks'),
-     Input('vehicle-dropdown', 'value')],
-    [State('upload-data', 'children')],
+    Input('tabs', 'active_tab'),
+    Input('analyze-button', 'n_clicks'),
+    Input('vehicle-dropdown', 'value'),
+    State('upload-data', 'data'),
     prevent_initial_call=False
 )
 def render_tab_content(active_tab, n_clicks, vehicle_number, data_json):
@@ -1266,16 +1568,16 @@ def render_track_maps(df, vehicle_number):
 
 # Add callback for track map display
 @app.callback(
-    [Output('track-map-display', 'figure'),
-     Output('track-info-cards', 'children'),
-     Output('circuit-config-table', 'children'),
-     Output('lap-selector', 'options')],
-    [Input('track-selector', 'value'),
-     Input('map-quality', 'value'),
-     Input('overlay-options', 'value'),
-     Input('lap-selector', 'value')],
-    [State('upload-data', 'children'),
-     State('vehicle-dropdown', 'value')]
+    Output('track-map-display', 'figure'),
+    Output('track-info-cards', 'children'),
+    Output('circuit-config-table', 'children'),
+    Output('lap-selector', 'options'),
+    Input('track-selector', 'value'),
+    Input('map-quality', 'value'),
+    Input('overlay-options', 'value'),
+    Input('lap-selector', 'value'),
+    State('upload-data', 'data'),
+    State('vehicle-dropdown', 'value')
 )
 def update_track_map(track_name, quality, overlay_options, selected_lap, data_json, vehicle_number):
     """Update track map display with telemetry overlay and circuit configuration"""
@@ -1557,11 +1859,19 @@ if WEEK1_ENABLED:
     [Input('analyze-btn-speed', 'n_clicks'),
      Input('analyze-btn-braking', 'n_clicks'),
      Input('analyze-btn-cornering', 'n_clicks'),
+     Input('analyze-btn-throttle', 'n_clicks'),
+     Input('analyze-btn-steering', 'n_clicks'),
+     Input('analyze-btn-powertrain', 'n_clicks'),
+     Input('analyze-btn-composite', 'n_clicks'),
+     Input('analyze-btn-lap_seg', 'n_clicks'),
+     Input('analyze-btn-uncategorized', 'n_clicks'),
      Input('close-corner-modal', 'n_clicks')],
     [State('corner-analysis-modal', 'is_open')],
     prevent_initial_call=True
 )
-def toggle_corner_modal(speed_clicks, brake_clicks, corner_clicks, close_clicks, is_open):
+def toggle_corner_modal(speed_clicks, brake_clicks, corner_clicks, throttle_clicks,
+                       steering_clicks, powertrain_clicks, composite_clicks,
+                       lap_seg_clicks, uncategorized_clicks, close_clicks, is_open):
     """
     Toggle corner analysis modal when Analyze buttons are clicked.
 
@@ -1590,7 +1900,13 @@ def toggle_corner_modal(speed_clicks, brake_clicks, corner_clicks, close_clicks,
         category_names = {
             'speed': 'Speed & Acceleration',
             'braking': 'Braking Performance',
-            'cornering': 'Cornering Dynamics'
+            'cornering': 'Cornering Dynamics',
+            'throttle': 'Throttle Management',
+            'steering': 'Steering Control',
+            'powertrain': 'Powertrain & Gear Management',
+            'composite': 'Composite Performance Metrics',
+            'lap_seg': 'Lap Segmentation & Timing',
+            'uncategorized': 'Other Features'
         }
         category_name = category_names.get(category_id, 'Performance')
 
@@ -1790,6 +2106,91 @@ if WEEK1_ENABLED:
         logger.info("Post-race analysis callbacks registered")
     except Exception as e:
         logger.error(f"Failed to register post-race analysis callbacks: {e}")
+
+    # Register help documentation callbacks
+    try:
+        create_help_callbacks(app)
+        logger.info("Help documentation callbacks registered")
+    except Exception as e:
+        logger.error(f"Failed to register help documentation callbacks: {e}")
+
+# Register chatbot callbacks
+print("=" * 80)
+print(f"DEBUG: CHATBOT CALLBACK REGISTRATION - CHATBOT_ENABLED = {CHATBOT_ENABLED}")
+print("=" * 80)
+logger.info("=" * 80)
+logger.info(f"DEBUG: CHATBOT CALLBACK REGISTRATION - CHATBOT_ENABLED = {CHATBOT_ENABLED}")
+logger.info("=" * 80)
+if CHATBOT_ENABLED:
+    print("DEBUG: ✓ CHATBOT_ENABLED is True, registering callbacks...")
+    logger.info("DEBUG: ✓ CHATBOT_ENABLED is True, registering callbacks...")
+    try:
+        create_chatbot_callbacks(app)
+        print("DEBUG: ✓ CHATBOT CALLBACKS REGISTERED SUCCESSFULLY")
+        logger.info("✓ Chatbot callbacks registered successfully")
+    except Exception as e:
+        print(f"DEBUG: ✗ CHATBOT CALLBACK REGISTRATION FAILED - {e}")
+        logger.error(f"Failed to register chatbot callbacks: {e}")
+else:
+    print("DEBUG: ✗ CHATBOT_ENABLED is False, skipping callback registration")
+    logger.info("DEBUG: ✗ CHATBOT_ENABLED is False, skipping callback registration")
+print("=" * 80)
+
+#================================================================
+# TOUR SYSTEM CALLBACKS
+#================================================================
+
+@app.callback(
+    [Output('tour-welcome-modal', 'is_open'),
+     Output('tour-state', 'data')],
+    [Input('tour-welcome-start', 'n_clicks'),
+     Input('tour-welcome-skip', 'n_clicks'),
+     Input('upload-data', 'data')],
+    [State('tour-state', 'data'),
+     State('tour-welcome-dont-show', 'value')],
+    prevent_initial_call=False
+)
+def handle_welcome_modal(start_clicks, skip_clicks, upload_data, tour_state, dont_show):
+    """
+    Handles welcome modal interactions.
+
+    - Shows modal on page load if data is loaded and modal hasn't been shown
+    - Start Tour: Closes modal, starts guided tour (Phase 2)
+    - Skip Tour: Closes modal, marks as completed
+    - Respects "Don't show again" preference
+    """
+    ctx = callback_context
+
+    # Check if we should show the modal on page load
+    if not ctx.triggered or ctx.triggered[0]['prop_id'] == 'upload-data.data':
+        # Show modal if:
+        # 1. Data is loaded (upload_data is not None)
+        # 2. Welcome hasn't been shown yet
+        # 3. User hasn't selected "don't show again"
+        if upload_data and not tour_state.get('welcome_shown', False) and not tour_state.get('dont_show_again', False):
+            return True, tour_state
+        else:
+            return False, tour_state
+
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # Start tour
+    if trigger_id == 'tour-welcome-start':
+        tour_state['welcome_shown'] = True
+        tour_state['dont_show_again'] = dont_show if dont_show else False
+        # TODO: In Phase 2, this will activate the tour overlay
+        logger.info("User started dashboard tour")
+        return False, tour_state
+
+    # Skip tour
+    if trigger_id == 'tour-welcome-skip':
+        tour_state['welcome_shown'] = True
+        tour_state['tour_completed'] = True
+        tour_state['dont_show_again'] = dont_show if dont_show else False
+        logger.info("User skipped dashboard tour")
+        return False, tour_state
+
+    return False, tour_state
 
 #================================================================
 # RUN APPLICATION
