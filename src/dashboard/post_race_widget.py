@@ -33,6 +33,7 @@ import io
 from typing import Optional, List, Tuple
 
 from src.models.inference.post_race_predictor import PostRacePredictor, load_session_data
+from src.models.inference.simple_post_race_predictor import SimplePostRacePredictor
 from src.dashboard.post_race_analyzer import PostRaceAnalyzer
 
 
@@ -55,6 +56,14 @@ def create_post_race_layout():
         Dash layout component
     """
     return dbc.Container([
+        # AUTO-LOAD INFRASTRUCTURE
+        # Hidden store for auto-loaded data
+        dcc.Store(id='post-race-autoload-store', storage_type='memory'),
+
+        # Status message area (success/error messages)
+        html.Div(id='post-race-autoload-status', children=[], className="mb-3"),
+
+
         # Header
         dbc.Row([
             dbc.Col([
@@ -238,6 +247,137 @@ def create_post_race_layout():
     ], fluid=True)
 
 
+
+
+# ============================================================================
+# AUTO-LOAD CALLBACK
+# ============================================================================
+
+def _create_autoload_callback(app):
+    """
+    Auto-load master_racing_data.csv when Tab 5 is accessed
+
+    Triggers when user navigates to post-race tab
+    Only loads once per session (cached in dcc.Store)
+    """
+    from dash import Output, Input, State
+    from dash.exceptions import PreventUpdate
+
+    @app.callback(
+        [Output('post-race-autoload-store', 'data'),
+         Output('post-race-autoload-status', 'children')],
+        [Input('tabs', 'active_tab')],  # FIXED: Use 'active_tab' instead of 'value' for dbc.Tabs
+        [State('post-race-autoload-store', 'data')]
+    )
+    def auto_load_master_csv(active_tab, current_data):
+        """Auto-load CSV when tab becomes active"""
+        # Only trigger on post-race tab
+        if active_tab not in ['tab-post-race', 'tab-8', 'tab-5']:  # Handle multiple tab ID variations
+            raise PreventUpdate
+
+        # Don't reload if data already exists
+        if current_data is not None:
+            raise PreventUpdate
+
+        import platform
+        from pathlib import Path
+        import pandas as pd
+
+        # Platform detection
+        is_production = platform.system() == 'Linux'
+
+        # Determine file path
+        if is_production:
+            csv_path = Path('/home/tactical/racing_analytics/data/master_racing_data.csv')
+        else:
+            csv_path = Path('data/master_racing_data.csv')
+
+        # Check if file exists
+        if not csv_path.exists():
+            error_msg = dbc.Alert(
+                [
+                    html.H6("Auto-Load Failed", className="alert-heading"),
+                    html.P(f"File not found: {csv_path}"),
+                    html.Hr(),
+                    html.P("Please upload a telemetry file manually.", className="mb-0")
+                ],
+                color="warning",
+                dismissable=True
+            )
+            return None, error_msg
+
+        try:
+            # Load CSV
+            df = pd.read_csv(csv_path)
+
+            # Validate required columns
+            required_cols = ['telemetry_name', 'telemetry_value', 'vehicle_number',
+                            'timestamp', 'lap', 'source_file']
+            missing_cols = [col for col in required_cols if col not in df.columns]
+
+            if missing_cols:
+                error_msg = dbc.Alert(
+                    [
+                        html.H6("Invalid CSV Format", className="alert-heading"),
+                        html.P(f"Missing columns: {', '.join(missing_cols)}")
+                    ],
+                    color="danger",
+                    dismissable=True
+                )
+                return None, error_msg
+
+            # Store data
+            data = {
+                'telemetry': df.to_dict('records'),
+                'filename': csv_path.name,
+                'rows': len(df),
+                'vehicles': int(df['vehicle_number'].nunique()),
+                'sources': int(df['source_file'].nunique()),
+                'columns': list(df.columns)
+            }
+
+            # Success message
+            success_msg = dbc.Alert(
+                [
+                    html.H6([
+                        html.I(className="fas fa-check-circle me-2"),
+                        "Auto-Load Successful"
+                    ], className="alert-heading"),
+                    html.P([
+                        f"Loaded ",
+                        html.Strong(f"{len(df):,}"),
+                        " telemetry samples from ",
+                        html.Code(csv_path.name)
+                    ]),
+                    html.Hr(),
+                    html.Div([
+                        dbc.Badge(f"{data['vehicles']} vehicles", color="primary", className="me-2"),
+                        dbc.Badge(f"{data['sources']} race sessions", color="info", className="me-2"),
+                        dbc.Badge(f"{len(data['columns'])} columns", color="secondary")
+                    ])
+                ],
+                color="success",
+                dismissable=True,
+                className="mb-0"
+            )
+
+            print(f"[AUTO-LOAD] Successfully loaded {len(df):,} rows from {csv_path.name}")
+            return data, success_msg
+
+        except Exception as e:
+            error_msg = dbc.Alert(
+                [
+                    html.H6("Error Loading CSV", className="alert-heading"),
+                    html.P(f"{str(e)}"),
+                    html.Hr(),
+                    html.P("Please check the file format and try uploading manually.", className="mb-0")
+                ],
+                color="danger",
+                dismissable=True
+            )
+            print(f"[AUTO-LOAD ERROR] {e}")
+            return None, error_msg
+
 def create_post_race_callbacks(app):
     """
     Register callbacks for Post-Race Analysis tab
@@ -246,8 +386,20 @@ def create_post_race_callbacks(app):
         app: Dash app instance
     """
 
+    # Register auto-load callback
+    _create_autoload_callback(app)
+
+
     # Initialize predictor and analyzer
-    predictor = PostRacePredictor()
+    # Use SimplePostRacePredictor for better compatibility with minimal sensor data
+    try:
+        predictor = SimplePostRacePredictor()
+        print("[INFO] Using SimplePostRacePredictor (basic features only)")
+    except Exception as e:
+        print(f"[WARNING] SimplePostRacePredictor failed: {e}")
+        print("[INFO] Falling back to PostRacePredictor")
+        predictor = PostRacePredictor()
+
     analyzer = PostRaceAnalyzer(anomaly_threshold=2.5)
 
     @app.callback(
@@ -571,51 +723,111 @@ def create_post_race_callbacks(app):
         Input('post-race-track-dropdown', 'value')
     )
     def update_race_dropdown(track):
-        """Populate race options based on selected track - ONLY VALID RACES WITH TELEMETRY"""
+        """
+        Populate race options based on selected track
+
+        Works in two modes:
+        1. Development (Windows): Browse organized_data/ directory
+        2. Production (Linux): Extract from master_racing_data.csv
+        """
         if not track:
             return []
 
-        from data_loader import RacingDataLoader
+        import platform
         from pathlib import Path
 
-        loader = RacingDataLoader()
+        # Detect platform
+        is_production = platform.system() == 'Linux'
 
-        try:
-            races = loader.list_races(track)
+        if is_production:
+            # PRODUCTION MODE: Extract races from CSV
+            try:
+                import pandas as pd
 
-            # Filter to only races with telemetry data
-            valid_races = []
-            for race in races:
-                try:
-                    categories = loader.list_categories(track, race)
+                # Platform-aware CSV path
+                if is_production:
+                    csv_path = Path("/home/tactical/racing_analytics/data/master_racing_data.csv")
+                else:
+                    csv_path = Path("data/master_racing_data.csv")
 
-                    # Check if telemetry exists
-                    if 'telemetry' in categories:
-                        # Verify telemetry files exist
-                        telemetry_dir = Path(f"organized_data/{track}/{race}/telemetry")
-                        if telemetry_dir.exists():
-                            telemetry_files = list(telemetry_dir.glob("*.csv"))
-                            if len(telemetry_files) > 0:
-                                valid_races.append(race)
-                except:
-                    continue
+                if not csv_path.exists():
+                    print(f"Info: {csv_path} not found, race selection disabled")
+                    return []
 
-            # Format race names nicely
-            options = []
-            for race in valid_races:
-                # Clean up display name
-                if race.endswith('.csv') or len(race) > 30:
-                    # Skip CSV filenames or very long names
-                    continue
+                # Read CSV and extract source_file column
+                df = pd.read_csv(csv_path, usecols=['source_file'])
 
-                label = race.replace('_', ' ').replace('-', ' ').title()
-                options.append({'label': label, 'value': race})
+                # Extract track-specific files
+                # source_file format: "track-name_session_type"
+                track_files = df[df['source_file'].str.contains(track, case=False, na=False)]
 
-            return sorted(options, key=lambda x: x['value'])
+                if track_files.empty:
+                    return []
 
-        except Exception as e:
-            print(f"Error loading races for {track}: {e}")
-            return []
+                # Extract unique race/session names
+                unique_sessions = track_files['source_file'].unique()
+
+                # Create options from unique sessions
+                options = []
+                for session in unique_sessions:
+                    # Clean up display name and map to user-friendly format
+                    session_suffix = session.replace(track + '_', '')
+
+                    # Map common session types to user-friendly names
+                    if session_suffix == 'full' or session.endswith('_full'):
+                        display_name = 'Race 1'
+                    elif session_suffix == 'simplified' or session.endswith('_simplified'):
+                        display_name = 'Race 2'
+                    elif session_suffix.startswith('race_'):
+                        # Already in race_N format
+                        display_name = session_suffix.replace('_', ' ').title()
+                    else:
+                        # Generic cleanup for other formats
+                        display_name = session_suffix.replace('_', ' ').title()
+
+                    options.append({'label': display_name, 'value': session})
+
+                return sorted(options, key=lambda x: x['label'])
+
+            except Exception as e:
+                print(f"Error extracting races from CSV: {e}")
+                import traceback
+                traceback.print_exc()
+                return []
+        else:
+            # DEVELOPMENT MODE: Browse organized_data/ directory
+            try:
+                from data_loader import RacingDataLoader
+                loader = RacingDataLoader()
+                races = loader.list_races(track)
+
+                # Filter to only races with telemetry data
+                valid_races = []
+                for race in races:
+                    try:
+                        categories = loader.list_categories(track, race)
+                        if 'telemetry' in categories:
+                            telemetry_dir = Path(f"organized_data/{track}/{race}/telemetry")
+                            if telemetry_dir.exists():
+                                telemetry_files = list(telemetry_dir.glob("*.csv"))
+                                if len(telemetry_files) > 0:
+                                    valid_races.append(race)
+                    except:
+                        continue
+
+                # Format race names nicely
+                options = []
+                for race in valid_races:
+                    if race.endswith('.csv') or len(race) > 30:
+                        continue
+                    label = race.replace('_', ' ').replace('-', ' ').title()
+                    options.append({'label': label, 'value': race})
+
+                return sorted(options, key=lambda x: x['value'])
+
+            except Exception as e:
+                print(f"Error loading races (development mode): {e}")
+                return []
 
     # Callback to populate driver dropdown based on track/race selection
     @app.callback(
@@ -624,37 +836,74 @@ def create_post_race_callbacks(app):
          Input('post-race-race-dropdown', 'value')]
     )
     def update_drivers_dropdown(track, race):
-        """Populate driver options based on selected track and race"""
+        """
+        Populate driver options based on selected track and race
+
+        Works in two modes:
+        1. Development: Browse organized_data/
+        2. Production: Extract from master_racing_data.csv
+        """
         if not track or not race:
             return []
 
-        from data_loader import RacingDataLoader
+        import platform
         from pathlib import Path
 
-        loader = RacingDataLoader()
+        is_production = platform.system() == 'Linux'
 
-        try:
-            # Sample first 5 chunks to get vehicle list quickly
-            # Most vehicles appear in early chunks
-            telemetry_dir = Path(f"organized_data/{track}/{race}/telemetry")
-            if not telemetry_dir.exists():
+        if is_production:
+            # PRODUCTION MODE: Extract vehicles from CSV
+            try:
+                import pandas as pd
+
+                # Platform-aware CSV path
+                if is_production:
+                    csv_path = Path("/home/tactical/racing_analytics/data/master_racing_data.csv")
+                else:
+                    csv_path = Path("data/master_racing_data.csv")
+
+                if not csv_path.exists():
+                    return []
+
+                # Read CSV and filter by source_file (race)
+                df = pd.read_csv(csv_path, usecols=['source_file', 'vehicle_number'])
+                race_data = df[df['source_file'] == race]
+
+                if race_data.empty:
+                    return []
+
+                # Get unique vehicle numbers
+                vehicles = sorted(race_data['vehicle_number'].dropna().unique())
+                return [{'label': f'Vehicle {int(v)}', 'value': int(v)} for v in vehicles if pd.notna(v)]
+
+            except Exception as e:
+                print(f"Error extracting vehicles from CSV: {e}")
                 return []
+        else:
+            # DEVELOPMENT MODE: Browse organized_data/
+            try:
+                from data_loader import RacingDataLoader
+                loader = RacingDataLoader()
 
-            chunk_files = sorted(telemetry_dir.glob("*.csv"))[:5]
-            all_vehicles = set()
+                telemetry_dir = Path(f"organized_data/{track}/{race}/telemetry")
+                if not telemetry_dir.exists():
+                    return []
 
-            for chunk_file in chunk_files:
-                chunk_num = int(chunk_file.stem.split('_')[-1])
-                chunk_df = loader.load_single_chunk(track, race, 'telemetry', chunk_num=chunk_num)
-                if 'vehicle_number' in chunk_df.columns:
-                    all_vehicles.update(chunk_df['vehicle_number'].dropna().unique())
+                chunk_files = sorted(telemetry_dir.glob("*.csv"))[:5]
+                all_vehicles = set()
 
-            vehicles = sorted(all_vehicles)
-            return [{'label': f'Vehicle {int(v)}', 'value': int(v)} for v in vehicles]
+                for chunk_file in chunk_files:
+                    chunk_num = int(chunk_file.stem.split('_')[-1])
+                    chunk_df = loader.load_single_chunk(track, race, 'telemetry', chunk_num=chunk_num)
+                    if 'vehicle_number' in chunk_df.columns:
+                        all_vehicles.update(chunk_df['vehicle_number'].dropna().unique())
 
-        except Exception as e:
-            print(f"Error loading drivers for {track}/{race}: {e}")
-            return []
+                vehicles = sorted(all_vehicles)
+                return [{'label': f'Vehicle {int(v)}', 'value': int(v)} for v in vehicles]
+
+            except Exception as e:
+                print(f"Error loading drivers (development mode): {e}")
+                return []
 
     # Download CSV callback
     @app.callback(

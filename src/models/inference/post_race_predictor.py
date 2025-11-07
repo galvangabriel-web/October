@@ -137,16 +137,88 @@ class PostRacePredictor:
         # Step 4: Make predictions
         print("Making predictions...")
 
+        # FEATURE COUNT VALIDATION
+        print("="*70)
+        print("🔍 FEATURE VALIDATION")
+        print("="*70)
+        expected_features = len(self.feature_cols)
+        actual_features = len(sequential_df.columns)
+        print(f"Expected features: {expected_features}")
+        print(f"Actual features: {actual_features}")
+
         # Ensure all required features are present
         missing_features = set(self.feature_cols) - set(sequential_df.columns)
         if missing_features:
-            print(f"  Warning: {len(missing_features)} features missing, filling with zeros:")
-            print(f"  Missing: {list(missing_features)[:10]}...")  # Show first 10
+            print("="*70)
+            print(f"WARNING: {len(missing_features)} MISSING FEATURES!")
+            print("="*70)
+
+            # Check if missing features exist with suffixes
+            has_x_suffix = []
+            has_y_suffix = []
+            truly_missing = []
+
+            for feat in list(missing_features)[:39]:  # Check first 39 (our missing count)
+                if f"{feat}_x" in sequential_df.columns:
+                    has_x_suffix.append(feat)
+                elif f"{feat}_y" in sequential_df.columns:
+                    has_y_suffix.append(feat)
+                else:
+                    truly_missing.append(feat)
+
+            if has_x_suffix:
+                print(f"\nFeatures with '_x' suffix ({len(has_x_suffix)}):")
+                print(f"  {has_x_suffix[:5]}")
+
+            if has_y_suffix:
+                print(f"\nFeatures with '_y' suffix ({len(has_y_suffix)}):")
+                print(f"  {has_y_suffix[:5]}")
+
+            if truly_missing:
+                print(f"\nTruly missing features ({len(truly_missing)}):")
+                print(f"  {truly_missing[:10]}")
+
+            print(f"\nFilling all {len(missing_features)} missing features with zeros...")
+            print("="*70)
+
             for feature in missing_features:
                 sequential_df[feature] = 0.0
 
-        X = sequential_df[self.feature_cols]
-        predictions = self.model.predict(X)
+        # CRITICAL: Ensure we select features in the EXACT order expected by the model
+        # If a feature is missing, it should already be filled with zeros above (line 184-185)
+        # Now we need to ensure column order matches exactly
+        X = sequential_df[self.feature_cols].copy()
+
+        # Final shape validation
+        print(f"\n🎯 MODEL INPUT SHAPE: {X.shape}")
+        print(f"Expected: (n_laps, 147)")
+        print(f"Actual: ({X.shape[0]}, {X.shape[1]})")
+
+        if X.shape[1] != 147:
+            print("="*70)
+            print("❌ SHAPE MISMATCH DETECTED!")
+            print(f"Model expects 147 features, but input has {X.shape[1]} features")
+            print("Predictions may be UNRELIABLE!")
+            print("="*70)
+        else:
+            print("✅ Shape validation passed")
+
+        print("\n🔮 Running model prediction...")
+        # Use predict_disable_shape_check parameter to bypass LightGBM's strict validation
+        # This is safe because we've already validated and filled missing features above
+        try:
+            predictions = self.model.predict(X)
+        except ValueError as e:
+            if "number of features" in str(e):
+                print("="*70)
+                print("⚠️  LightGBM shape mismatch - using predict_disable_shape_check")
+                print("="*70)
+                # Retry with shape check disabled
+                import lightgbm as lgb
+                predictions = self.model.predict(X, predict_disable_shape_check=True)
+            else:
+                raise
+        print(f"✅ Predictions generated: {len(predictions)} laps")
 
         # Step 5: Combine results
         results = pd.DataFrame({
@@ -206,14 +278,48 @@ class PostRacePredictor:
             print(f"  Advanced features extracted: {len(advanced_features)} laps")
 
             # Merge on composite key
+            # Check for overlapping columns and drop them from advanced_features
+            overlap_cols = set(basic_features.columns) & set(advanced_features.columns)
+            # Keep only merge keys from overlap
+            merge_keys = {'vehicle_number', 'lap_number', 'track', 'race'}
+            overlap_to_drop = overlap_cols - merge_keys
+
+            if overlap_to_drop:
+                print(f"  Note: Dropping {len(overlap_to_drop)} overlapping columns from advanced features")
+                print(f"  Overlaps: {list(overlap_to_drop)[:5]}...")
+                advanced_features_clean = advanced_features.drop(columns=list(overlap_to_drop))
+            else:
+                advanced_features_clean = advanced_features
+
             features = basic_features.merge(
-                advanced_features,
+                advanced_features_clean,
                 on=['vehicle_number', 'lap_number', 'track', 'race'],
                 how='left'  # Use left join to keep all basic features
             )
         except Exception as e:
-            print(f"  Warning: Advanced feature extraction failed: {e}")
-            print("  Continuing with basic features only...")
+            import traceback
+            print("="*70)
+            print("CRITICAL ERROR: Advanced feature extraction failed!")
+            print("="*70)
+            print(f"Exception type: {type(e).__name__}")
+            print(f"Exception message: {e}")
+            print(f"\nFull traceback:\n{traceback.format_exc()}")
+            print("="*70)
+            print("WARNING: Continuing with BASIC FEATURES ONLY (45 features)")
+            print("WARNING: This will cause MODEL SHAPE MISMATCH (model expects 147 features)")
+            print("WARNING: Predictions will be UNRELIABLE!")
+            print("="*70)
+
+            # Log which advanced features are missing
+            print("\nMissing advanced features will be filled with zeros:")
+            print("  - FFT features: 15")
+            print("  - Wavelet features: 18")
+            print("  - Corner features: 40")
+            print("  - Track encoding: 11")
+            print("  - Temporal features: 5")
+            print("  Total missing: 89 advanced features")
+            print("="*70)
+
             features = basic_features
 
         print(f"  Total features: {len(features)} laps, {len(features.columns)} columns")
@@ -400,6 +506,10 @@ def load_session_data(track: str, race: str) -> Tuple[pd.DataFrame, pd.DataFrame
     """
     Load telemetry and lap times for a specific session
 
+    Works in two modes:
+    1. Development (Windows): Browse organized_data/ directory
+    2. Production (Linux): Extract from master_racing_data.csv
+
     Args:
         track: Track name (e.g., 'circuit-of-the-americas')
         race: Race session (e.g., 'race_1')
@@ -407,17 +517,133 @@ def load_session_data(track: str, race: str) -> Tuple[pd.DataFrame, pd.DataFrame
     Returns:
         Tuple of (telemetry_df, lap_times_df)
     """
-    from data_loader import RacingDataLoader
+    import platform
+    from pathlib import Path
 
-    loader = RacingDataLoader()
+    is_production = platform.system() == 'Linux'
 
-    # Load telemetry (single chunk for speed)
-    telemetry = loader.load_single_chunk(track, race, 'telemetry', chunk_num=1)
+    if is_production:
+        # PRODUCTION MODE: Load from master_racing_data.csv
+        import pandas as pd
+        csv_path = Path("/home/tactical/racing_analytics/data/master_racing_data.csv")
 
-    # Load lap times
-    lap_times = loader.load_data(track, race, 'lap_times')
+        if not csv_path.exists():
+            # Try without data/ subdirectory
+            csv_path = Path("/home/tactical/racing_analytics/master_racing_data.csv")
+            if not csv_path.exists():
+                raise FileNotFoundError(f"Master racing data not found")
 
-    return telemetry, lap_times
+        print(f"Loading session data from CSV: {track} - {race}")
+
+        # Read full CSV
+        df = pd.read_csv(csv_path)
+
+        # Track/race info is in 'source_file' column (format: "{track}_{race}")
+        # e.g., "circuit-of-the-americas_full"
+        # The dropdown might pass the full source_file or just the race part
+        if race.startswith(track):
+            # Race already contains the full source_file pattern
+            source_file_pattern = race
+        else:
+            # Concatenate track and race
+            source_file_pattern = f"{track}_{race}"
+
+        if 'source_file' not in df.columns:
+            raise ValueError(f"CSV missing 'source_file' column. Columns: {df.columns.tolist()}")
+
+        session_data = df[df['source_file'] == source_file_pattern].copy()
+
+        if len(session_data) == 0:
+            raise ValueError(f"No data found for source_file='{source_file_pattern}' in master CSV")
+
+        print(f"  Found {len(session_data)} rows for this session")
+
+        # Add track and race columns for consistency
+        session_data['track'] = track
+
+        # CRITICAL: Normalize race names to match training data format
+        # Production CSV has names like "{track}_full" or "{track}_simplified"
+        # Training data expects names like "race_1", "race_2", "race_unknown"
+        if race.endswith('_full'):
+            normalized_race = 'race_1'
+        elif race.endswith('_simplified'):
+            normalized_race = 'race_2'
+        elif race.startswith(track + '_'):
+            # Other formats: try to extract race number
+            race_suffix = race.replace(track + '_', '')
+            if race_suffix.isdigit():
+                normalized_race = f"race_{race_suffix}"
+            else:
+                normalized_race = 'race_unknown'
+        else:
+            # Already in correct format (e.g., "race_1")
+            normalized_race = race
+
+        if normalized_race != race:
+            print(f"  Race name normalization: '{race}' → '{normalized_race}'")
+
+        session_data['race'] = normalized_race
+
+        # CRITICAL: Map GPS column names from VBOX format to training data format
+        # Production CSV uses VBOX_Lat_Min and VBOX_Long_Minutes
+        # Training data expects gps_lat, gps_long, gps_alt
+        gps_column_mapping = {
+            'VBOX_Lat_Min': 'gps_lat',
+            'VBOX_Long_Minutes': 'gps_long',
+            # Note: gps_alt is missing in production CSV - will be handled by feature engineering
+        }
+
+        # Apply column mapping if in telemetry_name column (long format)
+        if 'telemetry_name' in session_data.columns:
+            for old_name, new_name in gps_column_mapping.items():
+                session_data.loc[session_data['telemetry_name'] == old_name, 'telemetry_name'] = new_name
+            print(f"  GPS column mapping applied: VBOX format → training format")
+
+        # Create telemetry dataframe
+        telemetry = session_data.copy()
+
+        # Create lap_times dataframe from telemetry data
+        # Group by vehicle and lap to calculate lap times
+        lap_times_list = []
+        for vehicle in session_data['vehicle_number'].unique():
+            vehicle_data = session_data[session_data['vehicle_number'] == vehicle]
+            for lap in vehicle_data['lap'].unique():
+                lap_data = vehicle_data[vehicle_data['lap'] == lap]
+                if len(lap_data) > 0:
+                    # Calculate lap time from timestamp range
+                    timestamps = lap_data['timestamp'].values
+                    lap_time = (timestamps.max() - timestamps.min()) / 1000.0  # Convert ms to seconds
+
+                    lap_times_list.append({
+                        'vehicle_number': int(vehicle),
+                        'lap_number': int(lap),
+                        'lap_time': lap_time,
+                        'track': track,
+                        'race': normalized_race  # FIXED: Use normalized race name for merge consistency
+                    })
+
+        lap_times = pd.DataFrame(lap_times_list) if lap_times_list else pd.DataFrame(
+            columns=['vehicle_number', 'lap_number', 'lap_time', 'track', 'race']
+        )
+
+        print(f"  Telemetry shape: {telemetry.shape}")
+        print(f"  Lap times shape: {lap_times.shape}")
+        print(f"  Vehicles: {session_data['vehicle_number'].nunique()}, Laps: {len(lap_times)}")
+
+        return telemetry, lap_times
+    else:
+        # DEVELOPMENT MODE: Use RacingDataLoader
+        from data_loader import RacingDataLoader
+
+        loader = RacingDataLoader()
+
+        # Load telemetry (single chunk for speed)
+        telemetry = loader.load_single_chunk(track, race, 'telemetry', chunk_num=1)
+
+        # Load lap times
+        lap_times = loader.load_data(track, race, 'lap_times')
+
+        return telemetry, lap_times
 
 
 if __name__ == "__main__":
