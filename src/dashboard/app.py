@@ -1927,7 +1927,7 @@ def toggle_corner_modal(speed_clicks, brake_clicks, corner_clicks, throttle_clic
             html.I(className="fas fa-map-marked-alt me-2"),
             f"Corner Analysis - {category_name}"
         ]
-        body_content = create_corner_analysis_content(corner_analyses)
+        body_content = create_corner_analysis_content(corner_analyses, category_id)
 
         return True, header_content, body_content
 
