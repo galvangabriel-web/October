@@ -190,33 +190,33 @@ def create_patterns_summary_card(patterns: List[Dict]) -> dbc.Card:
             dbc.Row([
                 dbc.Col([
                     html.Div([
-                        html.I(className="fas fa-flag-checkered fa-2x mb-2", style={'color': '#3498db'}),
-                        html.H3(f"{total_impact:.2f}s", className="mb-0"),
-                        html.P("Total Time Savings", className="text-muted small mb-0")
+                        html.I(className="fas fa-flag-checkered fa-2x mb-2", style={'color': 'white'}),
+                        html.H3(f"{total_impact:.2f}s", className="mb-0", style={'color': 'white'}),
+                        html.P("Total Time Savings", className="small mb-0", style={'color': 'rgba(255,255,255,0.9)'})
                     ], className="text-center")
                 ], md=3),
 
                 dbc.Col([
                     html.Div([
-                        html.I(className="fas fa-exclamation-circle fa-2x mb-2", style={'color': '#dc3545'}),
-                        html.H3(str(high_severity), className="mb-0"),
-                        html.P("High Severity", className="text-muted small mb-0")
+                        html.I(className="fas fa-exclamation-circle fa-2x mb-2", style={'color': 'white'}),
+                        html.H3(str(high_severity), className="mb-0", style={'color': 'white'}),
+                        html.P("High Severity", className="small mb-0", style={'color': 'rgba(255,255,255,0.9)'})
                     ], className="text-center")
                 ], md=3),
 
                 dbc.Col([
                     html.Div([
-                        html.I(className="fas fa-exclamation-triangle fa-2x mb-2", style={'color': '#ffc107'}),
-                        html.H3(str(medium_severity), className="mb-0"),
-                        html.P("Medium Severity", className="text-muted small mb-0")
+                        html.I(className="fas fa-exclamation-triangle fa-2x mb-2", style={'color': 'white'}),
+                        html.H3(str(medium_severity), className="mb-0", style={'color': 'white'}),
+                        html.P("Medium Severity", className="small mb-0", style={'color': 'rgba(255,255,255,0.9)'})
                     ], className="text-center")
                 ], md=3),
 
                 dbc.Col([
                     html.Div([
-                        html.I(className="fas fa-info-circle fa-2x mb-2", style={'color': '#17a2b8'}),
-                        html.H3(str(low_severity), className="mb-0"),
-                        html.P("Low Severity", className="text-muted small mb-0")
+                        html.I(className="fas fa-info-circle fa-2x mb-2", style={'color': 'white'}),
+                        html.H3(str(low_severity), className="mb-0", style={'color': 'white'}),
+                        html.P("Low Severity", className="small mb-0", style={'color': 'rgba(255,255,255,0.9)'})
                     ], className="text-center")
                 ], md=3),
             ])
