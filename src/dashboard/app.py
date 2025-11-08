@@ -599,54 +599,389 @@ def create_dashboard_page():
 
         # Main content container - FULL WIDTH
         dbc.Container([
-            # Welcome and Capabilities Section
-            dbc.Card([
-                dbc.CardBody([
-                    html.H4([
-                        html.I(className="fas fa-rocket me-2", style={'color': '#667eea'}),
-                        "Welcome to GR Cup Racing Analytics"
-                    ], className="mb-3"),
-                    html.P([
-                        "Professional-grade telemetry analysis powered by ",
-                        html.Strong("97.49% accuracy AI"),
-                        " trained on 18.5GB of racing data. ",
-                        "This dashboard provides comprehensive insights into driver performance, lap times, and vehicle dynamics."
-                    ], className="mb-3", style={'fontSize': '1.05rem'}),
+            # ============================================================================
+            # HERO SECTION - Marketing-focused introduction
+            # ============================================================================
+            html.Div([
+                dbc.Card([
+                    dbc.CardBody([
+                        # Main headline
+                        html.H1([
+                            "AI-Powered Racing Intelligence"
+                        ], style={
+                            'fontSize': '48px',
+                            'fontWeight': '700',
+                            'color': 'white',
+                            'textAlign': 'center',
+                            'marginBottom': '1rem',
+                            'textShadow': '0 2px 4px rgba(0,0,0,0.3)',
+                            'fontFamily': 'Inter, sans-serif'
+                        }),
 
-                    html.H6("Dashboard Capabilities:", className="mb-2 fw-bold"),
-                    dbc.Row([
-                        dbc.Col([
-                            html.Ul([
-                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Real-time telemetry analysis (10Hz sensor data)"]),
-                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "AI-powered lap time predictions (±1.73s accuracy)"]),
-                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Multi-dimensional pattern detection (WHAT × WHERE × WHEN)"]),
-                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Advanced signal processing (FFT & wavelet analysis)"]),
-                            ], className="mb-0", style={'listStyle': 'none', 'paddingLeft': '0'})
-                        ], md=6),
-                        dbc.Col([
-                            html.Ul([
-                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Personalized coaching recommendations"]),
-                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Track-specific insights across 6 circuits"]),
-                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Comparative performance benchmarking"]),
-                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Interactive visualizations and animations"]),
-                            ], className="mb-0", style={'listStyle': 'none', 'paddingLeft': '0'})
-                        ], md=6),
-                    ])
-                ], style={'padding': '1.5rem', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px'})
-            ], className="mb-4", style={'border': '1px solid #dee2e6', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'}),
+                        # Sub-headline
+                        html.H4([
+                            "97.49% Accuracy. 18.5GB Training Data. Real Results."
+                        ], style={
+                            'color': 'rgba(255,255,255,0.95)',
+                            'textAlign': 'center',
+                            'marginBottom': '2.5rem',
+                            'fontWeight': '500',
+                            'fontSize': '24px',
+                            'fontFamily': 'Inter, sans-serif'
+                        }),
 
-            # Sensor Status Card (imported from post_race_widget)
-            create_sensor_status_card() if WEEK1_ENABLED else html.Div(),
+                        # Floating stats cards
+                        dbc.Row([
+                            dbc.Col([
+                                html.Div([
+                                    html.H2("71,000+", style={'color': 'white', 'fontWeight': '700', 'marginBottom': '0.5rem'}),
+                                    html.P("Telemetry Samples", style={'color': 'rgba(255,255,255,0.9)', 'marginBottom': '0', 'fontSize': '14px'})
+                                ], style={
+                                    'backgroundColor': 'rgba(255,255,255,0.15)',
+                                    'padding': '1.5rem',
+                                    'borderRadius': '12px',
+                                    'textAlign': 'center',
+                                    'backdropFilter': 'blur(10px)',
+                                    'border': '1px solid rgba(255,255,255,0.2)'
+                                })
+                            ], md=4, className="mb-3 mb-md-0"),
+                            dbc.Col([
+                                html.Div([
+                                    html.H2("97.49%", style={'color': 'white', 'fontWeight': '700', 'marginBottom': '0.5rem'}),
+                                    html.P("Prediction Accuracy", style={'color': 'rgba(255,255,255,0.9)', 'marginBottom': '0', 'fontSize': '14px'})
+                                ], style={
+                                    'backgroundColor': 'rgba(255,255,255,0.15)',
+                                    'padding': '1.5rem',
+                                    'borderRadius': '12px',
+                                    'textAlign': 'center',
+                                    'backdropFilter': 'blur(10px)',
+                                    'border': '1px solid rgba(255,255,255,0.2)'
+                                })
+                            ], md=4, className="mb-3 mb-md-0"),
+                            dbc.Col([
+                                html.Div([
+                                    html.H2("±1.73s", style={'color': 'white', 'fontWeight': '700', 'marginBottom': '0.5rem'}),
+                                    html.P("Lap Time Precision", style={'color': 'rgba(255,255,255,0.9)', 'marginBottom': '0', 'fontSize': '14px'})
+                                ], style={
+                                    'backgroundColor': 'rgba(255,255,255,0.15)',
+                                    'padding': '1.5rem',
+                                    'borderRadius': '12px',
+                                    'textAlign': 'center',
+                                    'backdropFilter': 'blur(10px)',
+                                    'border': '1px solid rgba(255,255,255,0.2)'
+                                })
+                            ], md=4),
+                        ])
+                    ], style={'padding': '3rem 2rem'})
+                ], style={
+                    'background': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    'border': 'none',
+                    'borderRadius': '16px',
+                    'boxShadow': '0 8px 32px rgba(102, 126, 234, 0.4)',
+                    'marginBottom': '2rem'
+                })
+            ]),
 
-            # AI Model Configuration Card (imported from post_race_widget)
-            create_ai_model_config_card() if WEEK1_ENABLED else html.Div(),
 
-            # Analysis Tabs Section - Visual Container
+            # ============================================================================
+            # STAR FEATURE SPOTLIGHT - Post-Race Analysis Highlight
+            # ============================================================================
+            html.Div([
+                dbc.Card([
+                    dbc.CardBody([
+                        # Feature badge
+                        html.Div([
+                            dbc.Badge([
+                                html.I(className='fas fa-trophy me-2'),
+                                'FLAGSHIP FEATURE'
+                            ], color='warning', className='mb-3', style={'fontSize': '0.9rem', 'fontWeight': '600'})
+                        ], style={'textAlign': 'center'}),
+
+                        # Feature title
+                        html.H2([
+                            html.I(className='fas fa-brain me-3', style={'color': '#667eea'}),
+                            'Post-Race Analysis - Your AI Race Engineer'
+                        ], style={
+                            'fontSize': '32px',
+                            'fontWeight': '700',
+                            'color': '#2c3e50',
+                            'textAlign': 'center',
+                            'marginBottom': '1.5rem',
+                            'fontFamily': 'Inter, sans-serif'
+                        }),
+
+                        # Feature description
+                        html.P([
+                            'Upload your telemetry and receive instant, personalized coaching insights powered by our championship-winning AI. ',
+                            'Get lap-by-lap analysis, corner-specific recommendations, and pattern detection that professional race engineers use.'
+                        ], style={
+                            'fontSize': '18px',
+                            'color': '#34495e',
+                            'textAlign': 'center',
+                            'marginBottom': '2rem',
+                            'lineHeight': '1.7'
+                        }),
+
+                        # Key selling points
+                        dbc.Row([
+                            dbc.Col([
+                                html.Div([
+                                    html.I(className='fas fa-check-circle fa-2x mb-2', style={'color': '#2ecc71'}),
+                                    html.H6('Multi-Dimensional Patterns', className='mb-1', style={'fontWeight': '600'}),
+                                    html.P('WHAT × WHERE × WHEN analysis', className='text-muted mb-0', style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ], md=4),
+                            dbc.Col([
+                                html.Div([
+                                    html.I(className='fas fa-chart-line fa-2x mb-2', style={'color': '#3498db'}),
+                                    html.H6('Coaching Insights', className='mb-1', style={'fontWeight': '600'}),
+                                    html.P('Specific, actionable recommendations', className='text-muted mb-0', style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ], md=4),
+                            dbc.Col([
+                                html.Div([
+                                    html.I(className='fas fa-stopwatch fa-2x mb-2', style={'color': '#e74c3c'}),
+                                    html.H6('Time Savings', className='mb-1', style={'fontWeight': '600'}),
+                                    html.P('Identify seconds per lap improvements', className='text-muted mb-0', style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ], md=4),
+                        ], className='mb-3'),
+
+                        # CTA Button (will be linked to Post-Race tab via callback)
+                        html.Div([
+                            dbc.Button([
+                                html.I(className='fas fa-rocket me-2'),
+                                'Analyze Your Session Now',
+                                html.I(className='fas fa-arrow-right ms-2')
+                            ],
+                            id='hero-analyze-btn',
+                            color='primary',
+                            size='lg',
+                            style={
+                                'fontSize': '18px',
+                                'padding': '12px 48px',
+                                'background': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                'border': 'none',
+                                'borderRadius': '50px',
+                                'fontWeight': '600',
+                                'boxShadow': '0 4px 15px rgba(102, 126, 234, 0.4)'
+                            })
+                        ], style={'textAlign': 'center'})
+                    ], style={'padding': '2.5rem'})
+                ], style={
+                    'border': '2px solid #667eea',
+                    'borderRadius': '16px',
+                    'boxShadow': '0 8px 32px rgba(102, 126, 234, 0.2)',
+                    'marginBottom': '2rem',
+                    'background': 'linear-gradient(to bottom, #ffffff 0%, #f8f9ff 100%)'
+                })
+            ]),
+
+            # ============================================================================
+            # FEATURE SHOWCASE GRID - 6 Premium Capability Cards
+            # ============================================================================
+            html.Div([
+                html.H3([
+                    "Platform Capabilities"
+                ], style={
+                    'fontSize': '32px',
+                    'fontWeight': '700',
+                    'color': '#2c3e50',
+                    'textAlign': 'center',
+                    'marginBottom': '2rem',
+                    'fontFamily': 'Inter, sans-serif'
+                }),
+
+                dbc.Row([
+                    # Card 1: Real-Time Telemetry
+                    dbc.Col([
+                        dbc.Card([
+                            html.Div(style={
+                                'height': '4px',
+                                'background': 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                                'borderRadius': '4px 4px 0 0'
+                            }),
+                            dbc.CardBody([
+                                html.Div([
+                                    html.I(className="fas fa-broadcast-tower fa-3x mb-3", style={'color': '#667eea'}),
+                                    html.H5("Real-Time Telemetry", className="mb-2", style={'fontWeight': '600'}),
+                                    html.P("12-channel sensor data @ 10Hz. Speed, braking, throttle, steering, GPS, and G-forces.",
+                                           className="text-muted mb-0", style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ])
+                        ], style={'border': '1px solid #e1e8ed', 'borderRadius': '12px'}, className="h-100")
+                    ], md=4, className="mb-4"),
+
+                    # Card 2: AI Predictions
+                    dbc.Col([
+                        dbc.Card([
+                            html.Div(style={
+                                'height': '4px',
+                                'background': 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                                'borderRadius': '4px 4px 0 0'
+                            }),
+                            dbc.CardBody([
+                                html.Div([
+                                    html.I(className="fas fa-brain fa-3x mb-3", style={'color': '#3498db'}),
+                                    html.H5("AI Predictions", className="mb-2", style={'fontWeight': '600'}),
+                                    html.P("Sequential LightGBM model with 97.49% R² accuracy trained on 18.5GB of championship data.",
+                                           className="text-muted mb-0", style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ])
+                        ], style={'border': '1px solid #e1e8ed', 'borderRadius': '12px'}, className="h-100")
+                    ], md=4, className="mb-4"),
+
+                    # Card 3: Track Coaching
+                    dbc.Col([
+                        dbc.Card([
+                            html.Div(style={
+                                'height': '4px',
+                                'background': 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                                'borderRadius': '4px 4px 0 0'
+                            }),
+                            dbc.CardBody([
+                                html.Div([
+                                    html.I(className="fas fa-chalkboard-teacher fa-3x mb-3", style={'color': '#2ecc71'}),
+                                    html.H5("Track Coaching", className="mb-2", style={'fontWeight': '600'}),
+                                    html.P("Corner-specific recommendations across 6 circuits. Learn where to brake, accelerate, and improve.",
+                                           className="text-muted mb-0", style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ])
+                        ], style={'border': '1px solid #e1e8ed', 'borderRadius': '12px'}, className="h-100")
+                    ], md=4, className="mb-4"),
+
+                    # Card 4: Pattern Detection
+                    dbc.Col([
+                        dbc.Card([
+                            html.Div(style={
+                                'height': '4px',
+                                'background': 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                                'borderRadius': '4px 4px 0 0'
+                            }),
+                            dbc.CardBody([
+                                html.Div([
+                                    html.I(className="fas fa-project-diagram fa-3x mb-3", style={'color': '#e74c3c'}),
+                                    html.H5("Pattern Detection", className="mb-2", style={'fontWeight': '600'}),
+                                    html.P("Multi-dimensional cube analysis identifies hidden driving patterns and improvement opportunities.",
+                                           className="text-muted mb-0", style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ])
+                        ], style={'border': '1px solid #e1e8ed', 'borderRadius': '12px'}, className="h-100")
+                    ], md=4, className="mb-4"),
+
+                    # Card 5: Visualizations
+                    dbc.Col([
+                        dbc.Card([
+                            html.Div(style={
+                                'height': '4px',
+                                'background': 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                                'borderRadius': '4px 4px 0 0'
+                            }),
+                            dbc.CardBody([
+                                html.Div([
+                                    html.I(className="fas fa-chart-area fa-3x mb-3", style={'color': '#f39c12'}),
+                                    html.H5("Interactive Visualizations", className="mb-2", style={'fontWeight': '600'}),
+                                    html.P("GPS track maps, animated laps, synchronized telemetry comparison, and real-time charts.",
+                                           className="text-muted mb-0", style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ])
+                        ], style={'border': '1px solid #e1e8ed', 'borderRadius': '12px'}, className="h-100")
+                    ], md=4, className="mb-4"),
+
+                    # Card 6: Benchmarking
+                    dbc.Col([
+                        dbc.Card([
+                            html.Div(style={
+                                'height': '4px',
+                                'background': 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                                'borderRadius': '4px 4px 0 0'
+                            }),
+                            dbc.CardBody([
+                                html.Div([
+                                    html.I(className="fas fa-trophy fa-3x mb-3", style={'color': '#9b59b6'}),
+                                    html.H5("Performance Benchmarking", className="mb-2", style={'fontWeight': '600'}),
+                                    html.P("Compare against top drivers, track records, and your personal bests across all sessions.",
+                                           className="text-muted mb-0", style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ])
+                        ], style={'border': '1px solid #e1e8ed', 'borderRadius': '12px'}, className="h-100")
+                    ], md=4, className="mb-4"),
+                ])
+            ], className="mb-4"),
+
+            # ============================================================================
+            # TECH POWER BAR - Impressive Platform Specifications
+            # ============================================================================
+            html.Div([
+                dbc.Card([
+                    dbc.CardBody([
+                        dbc.Row([
+                            dbc.Col([
+                                html.Div([
+                                    html.I(className="fas fa-database me-2", style={'color': '#667eea'}),
+                                    html.Strong("18.5GB", style={'fontSize': '18px', 'color': '#2c3e50'}),
+                                    html.Span(" Training Data", className="text-muted ms-1", style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ], md=2),
+                            dbc.Col([
+                                html.Div([
+                                    html.I(className="fas fa-car me-2", style={'color': '#3498db'}),
+                                    html.Strong("20", style={'fontSize': '18px', 'color': '#2c3e50'}),
+                                    html.Span(" Vehicles", className="text-muted ms-1", style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ], md=2),
+                            dbc.Col([
+                                html.Div([
+                                    html.I(className="fas fa-flag-checkered me-2", style={'color': '#2ecc71'}),
+                                    html.Strong("4,881", style={'fontSize': '18px', 'color': '#2c3e50'}),
+                                    html.Span(" Laps", className="text-muted ms-1", style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ], md=2),
+                            dbc.Col([
+                                html.Div([
+                                    html.I(className="fas fa-route me-2", style={'color': '#e74c3c'}),
+                                    html.Strong("6", style={'fontSize': '18px', 'color': '#2c3e50'}),
+                                    html.Span(" Tracks", className="text-muted ms-1", style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ], md=2),
+                            dbc.Col([
+                                html.Div([
+                                    html.I(className="fas fa-tachometer-alt me-2", style={'color': '#f39c12'}),
+                                    html.Strong("10Hz", style={'fontSize': '18px', 'color': '#2c3e50'}),
+                                    html.Span(" Sampling", className="text-muted ms-1", style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ], md=2),
+                            dbc.Col([
+                                html.Div([
+                                    html.I(className="fas fa-bolt me-2", style={'color': '#9b59b6'}),
+                                    html.Strong("<200ms", style={'fontSize': '18px', 'color': '#2c3e50'}),
+                                    html.Span(" API Response", className="text-muted ms-1", style={'fontSize': '14px'})
+                                ], style={'textAlign': 'center'})
+                            ], md=2),
+                        ])
+                    ], style={'padding': '1.5rem'})
+                ], style={
+                    'border': '1px solid #e1e8ed',
+                    'borderRadius': '12px',
+                    'background': 'linear-gradient(to right, #f8f9fa 0%, #ffffff 100%)',
+                    'marginBottom': '3rem'
+                })
+            ]),
+
+            # Analysis Tabs Section - Enhanced Visual Container
             dbc.Card([
                 dbc.CardHeader([
-                    html.I(className="fas fa-chart-line me-2"),
-                    "Analysis Tools"
-                ], style={'backgroundColor': '#f8f9fa', 'borderBottom': '2px solid #dee2e6'}),
+                    html.Div([
+                        html.H4([
+                            html.I(className="fas fa-chart-line me-3", style={'color': '#667eea'}),
+                            "Choose Your Analysis Tool"
+                        ], className="mb-0", style={'fontWeight': '600', 'fontSize': '24px', 'color': '#2c3e50'})
+                    ])
+                ], style={
+                    'backgroundColor': '#ffffff',
+                    'borderBottom': '3px solid #667eea',
+                    'padding': '1.5rem'
+                }),
                 dbc.CardBody([
                     # Vehicle selector - moved from footer to tab container
                     dbc.Row([
