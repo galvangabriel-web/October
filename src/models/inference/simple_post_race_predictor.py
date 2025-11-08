@@ -84,7 +84,7 @@ class SimplePostRacePredictor:
         # Extract basic features
         print("\n[1/4] Extracting basic features...")
         features_df = self._extract_basic_features(telemetry_df)
-        print(f"  ✓ Extracted {len(features_df)} laps with {len(features_df.columns)} features")
+        print(f"  [OK] Extracted {len(features_df)} laps with {len(features_df.columns)} features")
 
         if len(features_df) == 0:
             raise ValueError("Feature extraction failed - no laps processed")
@@ -96,7 +96,7 @@ class SimplePostRacePredictor:
             on=['vehicle_number', 'lap_number', 'track', 'race'],
             how='inner'
         )
-        print(f"  ✓ Merged: {len(merged_df)} laps")
+        print(f"  [OK] Merged: {len(merged_df)} laps")
 
         if len(merged_df) == 0:
             raise ValueError("Merge failed - check that track/race/vehicle_number match")
@@ -104,16 +104,16 @@ class SimplePostRacePredictor:
         # Prepare features for model
         print("\n[3/4] Preparing features for model...")
         X, feature_names = self._prepare_model_input(merged_df)
-        print(f"  ✓ Input shape: {X.shape}")
+        print(f"  [OK] Input shape: {X.shape}")
 
         # Make predictions
         print("\n[4/4] Making predictions...")
         try:
             predictions = self.model.predict(X, predict_disable_shape_check=True)
-            print(f"  ✓ Predictions generated: {len(predictions)} laps")
+            print(f"  [OK] Predictions generated: {len(predictions)} laps")
         except Exception as e:
-            print(f"  ⚠ Prediction error: {e}")
-            print(f"  ℹ Using fallback: average lap time")
+            print(f"  [WARNING] Prediction error: {e}")
+            print(f"  [INFO] Using fallback: average lap time")
             predictions = np.full(len(merged_df), merged_df['lap_time'].mean())
 
         # Combine results

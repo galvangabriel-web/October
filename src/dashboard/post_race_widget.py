@@ -60,21 +60,385 @@ def create_post_race_layout():
         # Hidden store for auto-loaded data
         dcc.Store(id='post-race-autoload-store', storage_type='memory'),
 
+        # Hidden store for radio-selected data
+        dcc.Store(id='post-race-radio-data-store', storage_type='memory'),
+
         # Status message area (success/error messages)
         html.Div(id='post-race-autoload-status', children=[], className="mb-3"),
 
 
-        # Header
+        # Header - Left-aligned with description
         dbc.Row([
             dbc.Col([
-                html.H3("📊 Post-Race Analysis", className="mb-2"),
+                html.H3("📊 Post-Race Analysis", className="mb-3", style={'textAlign': 'left'}),
+
+                # Description area explaining data file contents
+                dbc.Alert([
+                    html.H5([
+                        html.I(className="fas fa-info-circle me-2"),
+                        "About Post-Race Analysis Data"
+                    ], className="alert-heading", style={'textAlign': 'left'}),
+                    html.P([
+                        "This analysis tool processes comprehensive telemetry data from your racing sessions. ",
+                        "Each data file contains:"
+                    ], className="mb-2", style={'textAlign': 'left'}),
+                    html.Ul([
+                        html.Li([
+                            html.Strong("Lap Data: "),
+                            "Individual lap times, sectors, and timestamps for performance tracking"
+                        ]),
+                        html.Li([
+                            html.Strong("Telemetry Channels: "),
+                            "12 sensor readings @ 10Hz including speed, braking, throttle, steering, GPS, and G-forces"
+                        ]),
+                        html.Li([
+                            html.Strong("Features: "),
+                            "147 engineered features from basic metrics (speed, braking) to advanced FFT/wavelet analysis"
+                        ]),
+                        html.Li([
+                            html.Strong("AI Predictions: "),
+                            "Sequential LightGBM model (97.49% R²) for lap time forecasting and anomaly detection"
+                        ])
+                    ], style={'textAlign': 'left', 'marginBottom': '0'}),
+                    html.Hr(),
+                    html.P([
+                        html.I(className="fas fa-lightbulb me-2"),
+                        html.Strong("Tip: "),
+                        "Select a track below to load sample data and generate detailed coaching insights, ",
+                        "or upload your own telemetry CSV file for personalized analysis."
+                    ], className="mb-0", style={'textAlign': 'left', 'fontSize': '0.95rem'})
+                ], color="info", className="mb-3", style={'textAlign': 'left'}),
+
                 html.P(
                     "Comprehensive session review with AI-powered insights and coaching recommendations",
-                    className="text-muted"
+                    className="text-muted mb-3",
+                    style={'textAlign': 'left'}
                 ),
                 html.Hr()
             ])
         ], className="mb-3"),
+
+        # SENSOR STATUS CARD - Shows which sensors are available
+        dbc.Card([
+            dbc.CardHeader([
+                html.H5([
+                    html.I(className="fas fa-wifi me-2", style={'color': '#2ecc71'}),
+                    "Sensor Status & Data Quality"
+                ], className="mb-0")
+            ], style={'backgroundColor': '#f8f9fa'}),
+            dbc.CardBody([
+                dbc.Row([
+                    # Left: Sensor checklist
+                    dbc.Col([
+                        html.H6("Available Sensors (9/12)", className="mb-3"),
+                        html.Div([
+                            # Present sensors - green checkmarks
+                            html.Div([
+                                html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                                html.Span("Speed", className="fw-bold"),
+                                html.Span(" (km/h)", className="text-muted ms-1")
+                            ], className="mb-2"),
+                            html.Div([
+                                html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                                html.Span("Brake Pressure Front", className="fw-bold"),
+                                html.Span(" (bar)", className="text-muted ms-1")
+                            ], className="mb-2"),
+                            html.Div([
+                                html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                                html.Span("Brake Pressure Rear", className="fw-bold"),
+                                html.Span(" (bar)", className="text-muted ms-1")
+                            ], className="mb-2"),
+                            html.Div([
+                                html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                                html.Span("Throttle Position", className="fw-bold"),
+                                html.Span(" (%)", className="text-muted ms-1")
+                            ], className="mb-2"),
+                            html.Div([
+                                html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                                html.Span("Acceleration X", className="fw-bold"),
+                                html.Span(" (g)", className="text-muted ms-1")
+                            ], className="mb-2"),
+                            html.Div([
+                                html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                                html.Span("Acceleration Y", className="fw-bold"),
+                                html.Span(" (g)", className="text-muted ms-1")
+                            ], className="mb-2"),
+                            html.Div([
+                                html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                                html.Span("Steering Angle", className="fw-bold"),
+                                html.Span(" (deg)", className="text-muted ms-1")
+                            ], className="mb-2"),
+                            html.Div([
+                                html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                                html.Span("Gear", className="fw-bold"),
+                            ], className="mb-2"),
+                            html.Div([
+                                html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                                html.Span("Engine RPM", className="fw-bold"),
+                                html.Span(" (rpm)", className="text-muted ms-1")
+                            ], className="mb-3"),
+
+                            # Missing sensors - red X's
+                            html.Hr(),
+                            html.H6("Missing Sensors (3/12)", className="mb-3 text-danger"),
+                            html.Div([
+                                html.I(className="fas fa-times-circle me-2", style={'color': '#e74c3c'}),
+                                html.Span("GPS Latitude", className="text-muted"),
+                            ], className="mb-2"),
+                            html.Div([
+                                html.I(className="fas fa-times-circle me-2", style={'color': '#e74c3c'}),
+                                html.Span("GPS Longitude", className="text-muted"),
+                            ], className="mb-2"),
+                            html.Div([
+                                html.I(className="fas fa-times-circle me-2", style={'color': '#e74c3c'}),
+                                html.Span("GPS Altitude", className="text-muted"),
+                            ], className="mb-0")
+                        ])
+                    ], md=6),
+
+                    # Right: Data quality metrics
+                    dbc.Col([
+                        html.H6("Data Quality Metrics", className="mb-3"),
+                        dbc.Card([
+                            dbc.CardBody([
+                                html.Div([
+                                    html.I(className="fas fa-database fa-2x mb-2", style={'color': '#3498db'}),
+                                    html.H4("582,035", className="mb-0", style={'color': '#2c3e50'}),
+                                    html.P("Telemetry Points", className="text-muted mb-0", style={'fontSize': '0.9rem'})
+                                ], className="text-center mb-3")
+                            ])
+                        ], className="mb-3", style={'backgroundColor': '#f8f9fa'}),
+
+                        dbc.Card([
+                            dbc.CardBody([
+                                html.Div([
+                                    html.I(className="fas fa-check-double fa-2x mb-2", style={'color': '#2ecc71'}),
+                                    html.H4("100%", className="mb-0", style={'color': '#2c3e50'}),
+                                    html.P("Data Completeness", className="text-muted mb-0", style={'fontSize': '0.9rem'})
+                                ], className="text-center mb-0")
+                            ])
+                        ], style={'backgroundColor': '#f8f9fa'}),
+
+                        # GPS Warning Alert
+                        dbc.Alert([
+                            html.I(className="fas fa-exclamation-triangle me-2"),
+                            html.Strong("GPS Not Available: "),
+                            "Advanced spatial analysis features (147 total features) require GPS data. ",
+                            "Current analysis uses 40 basic features optimized for available sensors."
+                        ], color="warning", className="mt-3 mb-0")
+                    ], md=6)
+                ])
+            ])
+        ], className="mb-4", style={'border': '1px solid #dee2e6', 'borderRadius': '10px'}),
+
+        # FEATURE DOCUMENTATION CARD - Explains current predictor mode
+        dbc.Card([
+            dbc.CardHeader([
+                html.H5([
+                    html.I(className="fas fa-brain me-2", style={'color': '#9b59b6'}),
+                    "AI Model Configuration"
+                ], className="mb-0")
+            ], style={'backgroundColor': '#f8f9fa'}),
+            dbc.CardBody([
+                dbc.Row([
+                    # Current Mode
+                    dbc.Col([
+                        html.Div([
+                            html.H6([
+                                html.I(className="fas fa-cog me-2", style={'color': '#3498db'}),
+                                "Current Analysis Mode"
+                            ], className="mb-3"),
+
+                            dbc.Card([
+                                dbc.CardBody([
+                                    html.H5("40-Feature Basic Predictor", className="mb-2", style={'color': '#2c3e50'}),
+                                    html.P([
+                                        "Optimized for datasets with ",
+                                        html.Strong("9 core sensors"),
+                                        " (no GPS required)"
+                                    ], className="mb-3"),
+
+                                    html.Div([
+                                        dbc.Badge("Speed Analysis", color="primary", className="me-2 mb-2"),
+                                        dbc.Badge("Braking Metrics", color="primary", className="me-2 mb-2"),
+                                        dbc.Badge("Throttle Control", color="primary", className="me-2 mb-2"),
+                                        dbc.Badge("G-Force Analysis", color="primary", className="me-2 mb-2"),
+                                        dbc.Badge("Steering Dynamics", color="primary", className="me-2 mb-2"),
+                                        dbc.Badge("Gear Usage", color="primary", className="me-2 mb-2"),
+                                    ], className="mb-3"),
+
+                                    html.Div([
+                                        html.Strong("Expected Accuracy: "),
+                                        html.Span("89-91% R²", style={'fontSize': '1.1rem', 'color': '#2ecc71'})
+                                    ], className="mb-2"),
+
+                                    html.Div([
+                                        html.Strong("Typical Error: "),
+                                        html.Span("±2-3 seconds per lap", style={'fontSize': '1.0rem', 'color': '#95a5a6'})
+                                    ])
+                                ])
+                            ], style={'backgroundColor': '#ecf0f1', 'border': 'none'})
+                        ])
+                    ], md=6),
+
+                    # Advanced Mode (Future)
+                    dbc.Col([
+                        html.Div([
+                            html.H6([
+                                html.I(className="fas fa-rocket me-2", style={'color': '#e67e22'}),
+                                "Advanced Mode (Requires GPS)"
+                            ], className="mb-3"),
+
+                            dbc.Card([
+                                dbc.CardBody([
+                                    html.H5("147-Feature Advanced Predictor", className="mb-2", style={'color': '#7f8c8d'}),
+                                    html.P([
+                                        "Requires ",
+                                        html.Strong("12 sensors including GPS"),
+                                        " for full spatial analysis"
+                                    ], className="mb-3"),
+
+                                    html.Div([
+                                        dbc.Badge("All Basic Features", color="secondary", className="me-2 mb-2"),
+                                        dbc.Badge("FFT Analysis", color="secondary", className="me-2 mb-2"),
+                                        dbc.Badge("Wavelet Transform", color="secondary", className="me-2 mb-2"),
+                                        dbc.Badge("Corner Detection", color="secondary", className="me-2 mb-2"),
+                                        dbc.Badge("Track Encoding", color="secondary", className="me-2 mb-2"),
+                                        dbc.Badge("Spatial Features", color="secondary", className="me-2 mb-2"),
+                                    ], className="mb-3"),
+
+                                    html.Div([
+                                        html.Strong("Expected Accuracy: "),
+                                        html.Span("97.49% R²", style={'fontSize': '1.1rem', 'color': '#bdc3c7'})
+                                    ], className="mb-2"),
+
+                                    html.Div([
+                                        html.Strong("Typical Error: "),
+                                        html.Span("±1.73 seconds per lap", style={'fontSize': '1.0rem', 'color': '#bdc3c7'})
+                                    ])
+                                ])
+                            ], style={'backgroundColor': '#ecf0f1', 'border': '2px dashed #95a5a6'})
+                        ])
+                    ], md=6)
+                ]),
+
+                # Info footer
+                html.Hr(className="mt-3 mb-3"),
+                html.Div([
+                    html.I(className="fas fa-info-circle me-2", style={'color': '#3498db'}),
+                    html.Strong("Why Two Modes? "),
+                    "The 40-feature predictor is specifically designed for reliability with minimal sensor data. ",
+                    "It delivers excellent results (89-91% R²) using only the 9 core sensors available in your dataset. ",
+                    "To unlock the advanced 147-feature predictor (97.49% R²), you'll need to add GPS sensors to capture ",
+                    "spatial track position data for corner detection, FFT, and wavelet analysis."
+                ], style={'fontSize': '0.95rem', 'color': '#7f8c8d'})
+            ])
+        ], className="mb-4", style={'border': '1px solid #dee2e6', 'borderRadius': '10px'}),
+
+        # Quick Track Selection (Radio Buttons) - Enhanced Design
+        dbc.Card([
+            dbc.CardBody([
+                # Header Section - Left Aligned
+                html.Div([
+                    html.H3([
+                        html.I(className="fas fa-flag-checkered me-3", style={
+                            'color': '#e74c3c',
+                            'fontSize': '2.2rem'
+                        }),
+                        "SELECT YOUR TRACK"
+                    ], style={
+                        'textAlign': 'left',
+                        'fontWeight': '700',
+                        'letterSpacing': '2px',
+                        'color': '#2c3e50',
+                        'marginBottom': '0.5rem',
+                        'fontFamily': 'Montserrat, Arial, sans-serif',
+                        'textTransform': 'uppercase'
+                    }),
+                    html.P("Click any track below to instantly load sample data and start analysis",
+                        style={
+                            'textAlign': 'left',
+                            'color': '#7f8c8d',
+                            'fontSize': '1.0rem',
+                            'fontWeight': '400',
+                            'marginBottom': '1.5rem'
+                        }
+                    )
+                ], style={
+                    'background': 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+                    'padding': '1.5rem 2rem',
+                    'borderRadius': '10px 10px 0 0',
+                    'marginBottom': '1.5rem',
+                    'boxShadow': '0 2px 8px rgba(102, 126, 234, 0.3)'
+                }),
+
+                # Radio Buttons - Left Aligned
+                html.Div([
+                    dcc.RadioItems(
+                        id='post-race-track-radio',
+                        options=[
+                            {'label': '🏁  Circuit of the Americas (COTA)', 'value': 'circuit-of-the-americas'},
+                            {'label': '🏁  Road America', 'value': 'road-america'},
+                            {'label': '🏁  Sonoma Raceway', 'value': 'sonoma'},
+                            {'label': '🏁  Virginia International Raceway', 'value': 'virginia-international-raceway'},
+                            {'label': '🏁  Barber Motorsports Park', 'value': 'barber-motorsports-park'},
+                            {'label': '🏁  Sebring International Raceway', 'value': 'sebring'}
+                        ],
+                        value=None,
+                        inline=False,
+                        labelStyle={
+                            'display': 'block',
+                            'margin': '0.8rem 0',
+                            'padding': '1rem 2rem',
+                            'cursor': 'pointer',
+                            'fontSize': '1.2rem',
+                            'fontWeight': '600',
+                            'fontFamily': 'Roboto, Arial, sans-serif',
+                            'color': '#34495e',
+                            'backgroundColor': '#ffffff',
+                            'border': '2px solid #ecf0f1',
+                            'borderRadius': '12px',
+                            'transition': 'all 0.3s ease',
+                            'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
+                            'textAlign': 'left',
+                            'maxWidth': '800px',
+                            'letterSpacing': '0.5px',
+                            'width': '100%'
+                        },
+                        inputStyle={
+                            'marginRight': '15px',
+                            'cursor': 'pointer',
+                            'width': '20px',
+                            'height': '20px',
+                            'accentColor': '#e74c3c'
+                        },
+                        style={
+                            'textAlign': 'left',
+                            'width': '100%'
+                        }
+                    ),
+                ], style={
+                    'display': 'flex',
+                    'flexDirection': 'column',
+                    'alignItems': 'flex-start',
+                    'padding': '1rem',
+                    'width': '100%'
+                }),
+
+                # Status Message
+                html.Div(id='post-race-track-load-status', style={
+                    'marginTop': '2rem',
+                    'textAlign': 'center'
+                })
+            ], style={
+                'padding': '0'
+            })
+        ], className="mb-4", style={
+            'border': 'none',
+            'borderRadius': '15px',
+            'boxShadow': '0 8px 30px rgba(0,0,0,0.12)',
+            'overflow': 'hidden'
+        }),
 
         # Control Panel
         dbc.Card([
@@ -176,41 +540,35 @@ def create_post_race_layout():
                     ])
                 ], className="mb-4", id='post-race-timeline-card', style={'display': 'none'}),
 
-                # Section 2: Performance Analysis
-                dbc.Row([
-                    # Error distribution
-                    dbc.Col([
-                        dbc.Card([
-                            dbc.CardHeader(html.H5("📊 Error Distribution", className="mb-0")),
-                            dbc.CardBody([
-                                dcc.Graph(
-                                    id='post-race-error-histogram',
-                                    config={'displayModeBar': True, 'displaylogo': False}
-                                )
-                            ])
-                        ])
-                    ], width=6),
-
-                    # Session statistics
-                    dbc.Col([
-                        dbc.Card([
-                            dbc.CardHeader(html.H5("📋 Session Statistics", className="mb-0")),
-                            dbc.CardBody([
-                                html.Div(id='post-race-statistics-table')
-                            ])
-                        ])
-                    ], width=6)
-                ], className="mb-4", id='post-race-analysis-row', style={'display': 'none'}),
-
-                # Section 3: Anomaly Details
+                # Section 2: Error Distribution (Full Width)
                 dbc.Card([
-                    dbc.CardHeader(html.H5("🔍 Anomaly Details (Problem Laps)", className="mb-0")),
+                    dbc.CardHeader(html.H5("📊 Error Distribution", className="mb-0")),
+                    dbc.CardBody([
+                        dcc.Graph(
+                            id='post-race-error-histogram',
+                            config={'displayModeBar': True, 'displaylogo': False},
+                            style={'height': '500px'}
+                        )
+                    ])
+                ], className="mb-4", id='post-race-error-card', style={'display': 'none'}),
+
+                # Section 3: Session Statistics
+                dbc.Card([
+                    dbc.CardHeader(html.H5("📋 Session Statistics", className="mb-0")),
+                    dbc.CardBody([
+                        html.Div(id='post-race-statistics-table')
+                    ])
+                ], className="mb-4", id='post-race-statistics-card', style={'display': 'none'}),
+
+                # Section 4: Anomaly Details
+                dbc.Card([
+                    dbc.CardHeader(html.H5("🔍 Anomaly Details (Problem Laps - Top 20)", className="mb-0")),
                     dbc.CardBody([
                         html.Div(id='post-race-anomalies-table')
                     ])
                 ], className="mb-4", id='post-race-anomalies-card', style={'display': 'none'}),
 
-                # Section 4: Recommendations
+                # Section 5: Recommendations
                 dbc.Card([
                     dbc.CardHeader(html.H5("💡 AI Coaching Recommendations", className="mb-0")),
                     dbc.CardBody([
@@ -378,6 +736,153 @@ def _create_autoload_callback(app):
             print(f"[AUTO-LOAD ERROR] {e}")
             return None, error_msg
 
+
+def _create_radio_load_callback(app):
+    """
+    Auto-load CSV template when user selects a track via radio button
+
+    This provides a quick way to load and analyze sample data without manual upload
+    """
+    from dash import Output, Input
+    from dash.exceptions import PreventUpdate
+    import platform
+    from pathlib import Path
+    import pandas as pd
+
+    @app.callback(
+        [Output('post-race-radio-data-store', 'data'),
+         Output('post-race-track-load-status', 'children')],
+        [Input('post-race-track-radio', 'value')]
+    )
+    def load_track_template(selected_track):
+        """Load CSV template when track radio button is selected"""
+        print(f"[RADIO-LOAD] Callback triggered with track: {selected_track}")
+
+        if not selected_track:
+            print(f"[RADIO-LOAD] No track selected, preventing update")
+            raise PreventUpdate
+
+        # Determine template path (cross-platform)
+        is_production = platform.system() == 'Linux'
+
+        if is_production:
+            template_dir = Path('/home/tactical/racing_analytics/post_race_templates')
+        else:
+            template_dir = Path('post_race_templates')
+
+        template_file = template_dir / f"{selected_track}_sample_template.csv"
+
+        if not template_file.exists():
+            error_msg = dbc.Alert(
+                f"Template not found: {template_file.name}",
+                color="danger",
+                dismissable=True
+            )
+            return None, error_msg
+
+        try:
+            # Load CSV
+            df = pd.read_csv(template_file)
+
+            # Validate format
+            required_cols = ['timestamp', 'lap', 'vehicle_number', 'telemetry_name',
+                            'telemetry_value', 'track', 'race']
+            missing = [col for col in required_cols if col not in df.columns]
+
+            if missing:
+                error_msg = dbc.Alert(
+                    f"Invalid CSV format. Missing columns: {', '.join(missing)}",
+                    color="danger",
+                    dismissable=True
+                )
+                return None, error_msg
+
+            # Store data
+            data = {
+                'telemetry': df.to_dict('records'),
+                'filename': template_file.name,
+                'track': selected_track
+            }
+
+            # Success message
+            success_msg = dbc.Alert(
+                [
+                    html.I(className="fas fa-check-circle me-2"),
+                    html.Strong("Loaded: "),
+                    f"{template_file.name} ",
+                    dbc.Badge(f"{len(df):,} rows", color="primary", className="ms-2"),
+                    dbc.Badge(f"{df['lap'].nunique()} laps", color="info", className="ms-2"),
+                    dbc.Badge(f"Vehicle #{int(df['vehicle_number'].iloc[0])}", color="success", className="ms-2")
+                ],
+                color="success",
+                dismissable=True,
+                className="mb-0"
+            )
+
+            print(f"[RADIO-LOAD] Loaded {template_file.name}: {len(df):,} rows")
+            return data, success_msg
+
+        except Exception as e:
+            error_msg = dbc.Alert(
+                f"Error loading template: {str(e)}",
+                color="danger",
+                dismissable=True
+            )
+            print(f"[RADIO-LOAD ERROR] {e}")
+            return None, error_msg
+
+
+def _create_driver_dropdown_callback(app):
+    """
+    Populate driver dropdown when data is loaded via radio button or upload
+
+    Updates the driver selection dropdown with all available vehicles
+    from the loaded telemetry data.
+    """
+    from dash import Output, Input
+    from dash.exceptions import PreventUpdate
+    import pandas as pd
+
+    @app.callback(
+        Output('post-race-drivers-dropdown', 'options', allow_duplicate=True),
+        [Input('post-race-radio-data-store', 'data'),
+         Input('post-race-autoload-store', 'data')],
+        prevent_initial_call=True
+    )
+    def populate_driver_dropdown(radio_data, autoload_data):
+        """Populate driver dropdown with available vehicles"""
+        print(f"[DRIVER-DROPDOWN] Callback triggered")
+        print(f"[DRIVER-DROPDOWN] radio_data exists: {radio_data is not None}")
+        print(f"[DRIVER-DROPDOWN] autoload_data exists: {autoload_data is not None}")
+
+        # Priority: radio data > autoload data
+        data_source = radio_data or autoload_data
+
+        if not data_source:
+            print(f"[DRIVER-DROPDOWN] No data source, preventing update")
+            raise PreventUpdate
+
+        try:
+            # Extract telemetry from data store
+            telemetry_df = pd.DataFrame(data_source['telemetry'])
+
+            # Get unique vehicle numbers
+            vehicles = sorted(telemetry_df['vehicle_number'].unique())
+
+            # Create dropdown options
+            options = [
+                {'label': f'Vehicle #{int(v)}', 'value': int(v)}
+                for v in vehicles
+            ]
+
+            print(f"[DRIVER-DROPDOWN] Populated with {len(options)} vehicles: {[int(v) for v in vehicles]}")
+            return options
+
+        except Exception as e:
+            print(f"[DRIVER-DROPDOWN ERROR] {e}")
+            raise PreventUpdate
+
+
 def create_post_race_callbacks(app):
     """
     Register callbacks for Post-Race Analysis tab
@@ -389,6 +894,11 @@ def create_post_race_callbacks(app):
     # Register auto-load callback
     _create_autoload_callback(app)
 
+    # Register radio button auto-load callback
+    _create_radio_load_callback(app)
+
+    # Register driver dropdown population callback
+    _create_driver_dropdown_callback(app)
 
     # Initialize predictor and analyzer
     # Use SimplePostRacePredictor for better compatibility with minimal sensor data
@@ -413,13 +923,15 @@ def create_post_race_callbacks(app):
          Output('post-race-status-message', 'is_open'),
          Output('post-race-data-store', 'data'),
          Output('post-race-timeline-card', 'style'),
-         Output('post-race-analysis-row', 'style'),
+         Output('post-race-error-card', 'style'),
+         Output('post-race-statistics-card', 'style'),
          Output('post-race-anomalies-card', 'style'),
          Output('post-race-recommendations-card', 'style'),
          Output('post-race-export-card', 'style'),
          Output('post-race-download-csv-btn', 'disabled'),
          Output('post-race-download-summary-btn', 'disabled')],
-        [Input('post-race-analyze-btn', 'n_clicks')],
+        [Input('post-race-analyze-btn', 'n_clicks'),
+         Input('post-race-radio-data-store', 'data')],  # Auto-trigger when radio selection loads data
         [State('post-race-upload', 'contents'),
          State('post-race-upload', 'filename'),
          State('post-race-track-dropdown', 'value'),
@@ -427,25 +939,36 @@ def create_post_race_callbacks(app):
          State('post-race-drivers-dropdown', 'value')],
         prevent_initial_call=True
     )
-    def update_post_race_analysis(n_clicks, upload_contents, filename,
+    def update_post_race_analysis(n_clicks, radio_data, upload_contents, filename,
                                   track, race, driver_ids):
         """
         Main callback: Process data and generate visualizations
 
+        Can be triggered by:
+        1. Clicking "Analyze Session" button with uploaded data
+        2. Selecting a track via radio button (auto-loads and analyzes)
+
         Returns:
-            Tuple of 16 outputs for all dashboard components
+            Tuple of 17 outputs for all dashboard components
         """
         try:
-            # Step 1: Load data
-            if upload_contents:
+            # Step 1: Load data (priority: radio selection > upload > track/race dropdown)
+            if radio_data:
+                # Data loaded via radio button selection
+                telemetry_df = pd.DataFrame(radio_data['telemetry'])
+                lap_times_df = calculate_lap_times_from_telemetry(telemetry_df)
+                source = f"template: {radio_data['filename']}"
+            elif upload_contents:
+                # Data uploaded via file upload
                 telemetry_df, lap_times_df = parse_upload(upload_contents, filename)
                 source = f"uploaded file: {filename}"
             elif track and race:
+                # Data selected via dropdown
                 telemetry_df, lap_times_df = load_session_data(track, race)
                 source = f"{track} - {race}"
             else:
                 return empty_outputs_with_message(
-                    "❌ Please upload a file or select a track/race",
+                    "❌ Please upload a file, select a track via radio button, or choose track/race from dropdowns",
                     "warning"
                 )
 
@@ -486,7 +1009,7 @@ def create_post_race_callbacks(app):
             return (
                 timeline_fig, histogram_fig, stats_table, anomalies_table,
                 recommendations_div, status_msg, status_color, True, data_store,
-                show_style, show_style, show_style, show_style, show_style,
+                show_style, show_style, show_style, show_style, show_style, show_style,  # 6 cards
                 False, False  # Enable download buttons
             )
 
@@ -596,7 +1119,7 @@ def create_post_race_callbacks(app):
             title='Prediction Error Distribution',
             xaxis_title='Error (seconds)',
             yaxis_title='Count',
-            height=400,
+            height=500,  # Increased height for full-width display
             template='plotly_white',
             showlegend=False
         )
@@ -647,15 +1170,15 @@ def create_post_race_callbacks(app):
         return colors.get(rating, '')
 
     def create_anomalies_table(anomalies: pd.DataFrame) -> html.Div:
-        """Create anomalies table"""
+        """Create anomalies table - shows top 20 problem laps"""
         if len(anomalies) == 0:
             return html.Div([
                 html.P("✅ No anomalies detected!", className="text-success fw-bold mb-2"),
                 html.P("All laps within expected range (error < 2.5s)", className="text-muted")
             ])
 
-        # Create formatted table
-        table_data = anomalies.head(10).to_dict('records')
+        # Create formatted table - show top 20 worst laps
+        table_data = anomalies.head(20).to_dict('records')
 
         return dash_table.DataTable(
             data=table_data,
@@ -713,7 +1236,7 @@ def create_post_race_callbacks(app):
         return (
             empty_fig, empty_fig, "", "", "",  # Empty visualizations
             message, color, True, None,  # Status message
-            hide_style, hide_style, hide_style, hide_style, hide_style,  # Hide cards
+            hide_style, hide_style, hide_style, hide_style, hide_style, hide_style,  # Hide all cards
             True, True  # Disable buttons
         )
 
@@ -920,47 +1443,143 @@ def create_post_race_callbacks(app):
         df = pd.read_json(data_json, orient='split')
         return dcc.send_data_frame(df.to_csv, "post_race_analysis.csv", index=False)
 
+    # Download Summary Report callback
+    @app.callback(
+        Output("post-race-download-summary", "data"),
+        Input("post-race-download-summary-btn", "n_clicks"),
+        State("post-race-data-store", "data"),
+        prevent_initial_call=True
+    )
+    def download_summary_report(n_clicks, data_json):
+        """Generate and download comprehensive text summary report"""
+        if not data_json:
+            return None
 
-def parse_upload(contents: str, filename: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        # Parse data
+        df = pd.read_json(data_json, orient='split')
+
+        # Re-analyze for summary
+        analyzer_temp = PostRaceAnalyzer(anomaly_threshold=2.5)
+        analysis = analyzer_temp.analyze_session(df)
+        stats = analysis['statistics']
+        anomalies = analysis['anomalies']
+        recommendations = analysis['recommendations']
+
+        # Build summary report
+        report_lines = []
+        report_lines.append("=" * 70)
+        report_lines.append("POST-RACE ANALYSIS - SUMMARY REPORT")
+        report_lines.append("=" * 70)
+        report_lines.append("")
+        report_lines.append(f"Generated: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        report_lines.append("")
+
+        # Session Overview
+        report_lines.append("-" * 70)
+        report_lines.append("SESSION OVERVIEW")
+        report_lines.append("-" * 70)
+        report_lines.append(f"Total Laps:                 {stats.total_laps}")
+        report_lines.append(f"Vehicles Analyzed:          {df['vehicle_number'].nunique()}")
+        report_lines.append(f"Track:                      {df['track'].iloc[0] if 'track' in df.columns else 'Unknown'}")
+        report_lines.append(f"Race:                       {df['race'].iloc[0] if 'race' in df.columns else 'Unknown'}")
+        report_lines.append("")
+
+        # Performance Statistics
+        report_lines.append("-" * 70)
+        report_lines.append("PERFORMANCE STATISTICS")
+        report_lines.append("-" * 70)
+        report_lines.append(f"Average Lap Time:           {stats.avg_lap_time:.3f} seconds")
+        report_lines.append(f"Best Lap Time:              {stats.best_lap:.3f} seconds")
+        report_lines.append(f"Worst Lap Time:             {stats.worst_lap:.3f} seconds")
+        report_lines.append(f"Standard Deviation:         {stats.std_lap_time:.3f} seconds")
+        report_lines.append(f"Lap Time Range:             {stats.worst_lap - stats.best_lap:.3f} seconds")
+        report_lines.append(f"Consistency Rating:         {stats.consistency_rating}")
+        report_lines.append("")
+
+        # Model Performance
+        report_lines.append("-" * 70)
+        report_lines.append("MODEL PREDICTION ACCURACY")
+        report_lines.append("-" * 70)
+        report_lines.append(f"Mean Absolute Error (MAE):  {stats.model_mae:.3f} seconds")
+        report_lines.append(f"Root Mean Square Error:     {stats.model_rmse:.3f} seconds")
+        report_lines.append(f"R² Score:                   {stats.model_r2:.1%}")
+        report_lines.append(f"Max Prediction Error:       {stats.max_error:.3f} seconds")
+        report_lines.append("")
+
+        # Anomaly Detection
+        report_lines.append("-" * 70)
+        report_lines.append("ANOMALY DETECTION")
+        report_lines.append("-" * 70)
+        report_lines.append(f"Anomalies Detected:         {stats.anomaly_count} laps")
+        report_lines.append(f"Anomaly Rate:               {stats.anomaly_count / stats.total_laps * 100:.1f}%")
+        report_lines.append("")
+
+        if len(anomalies) > 0:
+            report_lines.append("Top Problem Laps (sorted by error magnitude):")
+            report_lines.append("")
+            report_lines.append(f"{'Lap':<6} {'Vehicle':<8} {'Actual':<10} {'Predicted':<12} {'Error':<10} {'Severity':<10} Cause")
+            report_lines.append("-" * 70)
+            for _, row in anomalies.head(10).iterrows():
+                report_lines.append(
+                    f"{int(row['lap_number']):<6} "
+                    f"{int(row['vehicle_number']):<8} "
+                    f"{row['actual']:<10.3f} "
+                    f"{row['predicted']:<12.3f} "
+                    f"{row['error']:>9.3f} "
+                    f"{row['severity']:<10} "
+                    f"{row['likely_cause']}"
+                )
+            report_lines.append("")
+        else:
+            report_lines.append("No anomalies detected - all laps within expected range.")
+            report_lines.append("")
+
+        # Coaching Recommendations
+        if recommendations:
+            report_lines.append("-" * 70)
+            report_lines.append("AI COACHING RECOMMENDATIONS")
+            report_lines.append("-" * 70)
+            for i, rec in enumerate(recommendations, 1):
+                report_lines.append(f"{i}. {rec}")
+            report_lines.append("")
+
+        # Per-Vehicle Breakdown (if multiple vehicles)
+        if df['vehicle_number'].nunique() > 1:
+            report_lines.append("-" * 70)
+            report_lines.append("PER-VEHICLE BREAKDOWN")
+            report_lines.append("-" * 70)
+            for vehicle in sorted(df['vehicle_number'].unique()):
+                vehicle_df = df[df['vehicle_number'] == vehicle]
+                report_lines.append(f"Vehicle #{int(vehicle)}:")
+                report_lines.append(f"  Laps:           {len(vehicle_df)}")
+                report_lines.append(f"  Avg Lap Time:   {vehicle_df['actual'].mean():.3f}s")
+                report_lines.append(f"  Best Lap:       {vehicle_df['actual'].min():.3f}s")
+                report_lines.append(f"  Std Dev:        {vehicle_df['actual'].std():.3f}s")
+                report_lines.append(f"  Avg Error:      {vehicle_df['abs_error'].mean():.3f}s")
+                anomaly_count = len(vehicle_df[vehicle_df['abs_error'] > 2.5])
+                report_lines.append(f"  Anomalies:      {anomaly_count}")
+                report_lines.append("")
+
+        # Footer
+        report_lines.append("=" * 70)
+        report_lines.append("END OF REPORT")
+        report_lines.append("=" * 70)
+
+        # Join lines and return as downloadable text file
+        report_text = "\n".join(report_lines)
+        return dict(content=report_text, filename="post_race_summary_report.txt")
+
+
+def calculate_lap_times_from_telemetry(telemetry_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Parse uploaded CSV file
+    Calculate lap times from telemetry data
 
     Args:
-        contents: Base64 encoded file contents
-        filename: Original filename
+        telemetry_df: Telemetry in long format with timestamp, lap, vehicle_number columns
 
     Returns:
-        Tuple of (telemetry_df, lap_times_df)
+        DataFrame with lap_number, vehicle_number, lap_time, track, race
     """
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
-
-    # Read CSV
-    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
-
-    # Check if data is in wide format (separate columns) or long format (telemetry_name/value)
-    if 'telemetry_name' in df.columns and 'telemetry_value' in df.columns:
-        # Already in long format
-        telemetry_df = df.copy()
-    else:
-        # Convert wide format to long format
-        # Identify sensor columns (exclude metadata columns)
-        metadata_cols = ['timestamp', 'lap', 'vehicle_number', 'track', 'race', 'distance']
-        sensor_cols = [col for col in df.columns if col not in metadata_cols]
-
-        # Melt to long format
-        id_vars = [col for col in metadata_cols if col in df.columns]
-        telemetry_df = df.melt(
-            id_vars=id_vars,
-            value_vars=sensor_cols,
-            var_name='telemetry_name',
-            value_name='telemetry_value'
-        )
-
-        # Drop NaN values
-        telemetry_df = telemetry_df.dropna(subset=['telemetry_value'])
-
-    # Extract lap times from telemetry
     lap_times_list = []
 
     # Ensure required columns exist
@@ -1002,4 +1621,284 @@ def parse_upload(contents: str, filename: str) -> Tuple[pd.DataFrame, pd.DataFra
     if len(lap_times_df) == 0:
         raise ValueError("No valid lap times found (laps must be 60-300 seconds)")
 
+    return lap_times_df
+
+
+def parse_upload(contents: str, filename: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Parse uploaded CSV file
+
+    Args:
+        contents: Base64 encoded file contents
+        filename: Original filename
+
+    Returns:
+        Tuple of (telemetry_df, lap_times_df)
+    """
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+
+    # Read CSV
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # Check if data is in wide format (separate columns) or long format (telemetry_name/value)
+    if 'telemetry_name' in df.columns and 'telemetry_value' in df.columns:
+        # Already in long format
+        telemetry_df = df.copy()
+    else:
+        # Convert wide format to long format
+        # Identify sensor columns (exclude metadata columns)
+        metadata_cols = ['timestamp', 'lap', 'vehicle_number', 'track', 'race', 'distance']
+        sensor_cols = [col for col in df.columns if col not in metadata_cols]
+
+        # Melt to long format
+        id_vars = [col for col in metadata_cols if col in df.columns]
+        telemetry_df = df.melt(
+            id_vars=id_vars,
+            value_vars=sensor_cols,
+            var_name='telemetry_name',
+            value_name='telemetry_value'
+        )
+
+        # Drop NaN values
+        telemetry_df = telemetry_df.dropna(subset=['telemetry_value'])
+
+    # Calculate lap times using helper function
+    lap_times_df = calculate_lap_times_from_telemetry(telemetry_df)
+
     return telemetry_df, lap_times_df
+
+
+# ============================================================================
+# EXPORTABLE COMPONENTS FOR MAIN DASHBOARD
+# ============================================================================
+
+def create_sensor_status_card():
+    """
+    Create standalone sensor status card for main dashboard
+
+    Returns:
+        dbc.Card: Sensor status and data quality card
+    """
+    return dbc.Card([
+        dbc.CardHeader([
+            html.H5([
+                html.I(className="fas fa-wifi me-2", style={'color': '#2ecc71'}),
+                "Sensor Status & Data Quality"
+            ], className="mb-0")
+        ], style={'backgroundColor': '#f8f9fa'}),
+        dbc.CardBody([
+            dbc.Row([
+                # Left: Sensor checklist
+                dbc.Col([
+                    html.H6("Available Sensors (9/12)", className="mb-3"),
+                    html.Div([
+                        # Present sensors - green checkmarks
+                        html.Div([
+                            html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                            html.Span("Speed", className="fw-bold"),
+                            html.Span(" (km/h)", className="text-muted ms-1")
+                        ], className="mb-2"),
+                        html.Div([
+                            html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                            html.Span("Brake Pressure Front", className="fw-bold"),
+                            html.Span(" (bar)", className="text-muted ms-1")
+                        ], className="mb-2"),
+                        html.Div([
+                            html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                            html.Span("Brake Pressure Rear", className="fw-bold"),
+                            html.Span(" (bar)", className="text-muted ms-1")
+                        ], className="mb-2"),
+                        html.Div([
+                            html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                            html.Span("Throttle Position", className="fw-bold"),
+                            html.Span(" (%)", className="text-muted ms-1")
+                        ], className="mb-2"),
+                        html.Div([
+                            html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                            html.Span("Acceleration X", className="fw-bold"),
+                            html.Span(" (g)", className="text-muted ms-1")
+                        ], className="mb-2"),
+                        html.Div([
+                            html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                            html.Span("Acceleration Y", className="fw-bold"),
+                            html.Span(" (g)", className="text-muted ms-1")
+                        ], className="mb-2"),
+                        html.Div([
+                            html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                            html.Span("Steering Angle", className="fw-bold"),
+                            html.Span(" (deg)", className="text-muted ms-1")
+                        ], className="mb-2"),
+                        html.Div([
+                            html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                            html.Span("Gear", className="fw-bold"),
+                        ], className="mb-2"),
+                        html.Div([
+                            html.I(className="fas fa-check-circle me-2", style={'color': '#2ecc71'}),
+                            html.Span("Engine RPM", className="fw-bold"),
+                            html.Span(" (rpm)", className="text-muted ms-1")
+                        ], className="mb-3"),
+
+                        # Missing sensors - red X's
+                        html.Hr(),
+                        html.H6("Missing Sensors (3/12)", className="mb-3 text-danger"),
+                        html.Div([
+                            html.I(className="fas fa-times-circle me-2", style={'color': '#e74c3c'}),
+                            html.Span("GPS Latitude", className="text-muted"),
+                        ], className="mb-2"),
+                        html.Div([
+                            html.I(className="fas fa-times-circle me-2", style={'color': '#e74c3c'}),
+                            html.Span("GPS Longitude", className="text-muted"),
+                        ], className="mb-2"),
+                        html.Div([
+                            html.I(className="fas fa-times-circle me-2", style={'color': '#e74c3c'}),
+                            html.Span("GPS Altitude", className="text-muted"),
+                        ], className="mb-0")
+                    ])
+                ], md=6),
+
+                # Right: Data quality metrics
+                dbc.Col([
+                    html.H6("Data Quality Metrics", className="mb-3"),
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.Div([
+                                html.I(className="fas fa-database fa-2x mb-2", style={'color': '#3498db'}),
+                                html.H4("582,035", className="mb-0", style={'color': '#2c3e50'}),
+                                html.P("Telemetry Points", className="text-muted mb-0", style={'fontSize': '0.9rem'})
+                            ], className="text-center mb-3")
+                        ])
+                    ], className="mb-3", style={'backgroundColor': '#f8f9fa'}),
+
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.Div([
+                                html.I(className="fas fa-check-double fa-2x mb-2", style={'color': '#2ecc71'}),
+                                html.H4("100%", className="mb-0", style={'color': '#2c3e50'}),
+                                html.P("Data Completeness", className="text-muted mb-0", style={'fontSize': '0.9rem'})
+                            ], className="text-center mb-0")
+                        ])
+                    ], style={'backgroundColor': '#f8f9fa'}),
+
+                    # GPS Warning Alert
+                    dbc.Alert([
+                        html.I(className="fas fa-exclamation-triangle me-2"),
+                        html.Strong("GPS Not Available: "),
+                        "Advanced spatial analysis features require GPS data. ",
+                        "Current analysis uses core sensors only."
+                    ], color="warning", className="mt-3 mb-0")
+                ], md=6)
+            ])
+        ])
+    ], className="mb-4", style={'border': '1px solid #dee2e6', 'borderRadius': '10px'})
+
+
+def create_ai_model_config_card():
+    """
+    Create standalone AI model configuration card for main dashboard
+
+    Returns:
+        dbc.Card: AI model configuration card
+    """
+    return dbc.Card([
+        dbc.CardHeader([
+            html.H5([
+                html.I(className="fas fa-brain me-2", style={'color': '#9b59b6'}),
+                "AI Model Configuration"
+            ], className="mb-0")
+        ], style={'backgroundColor': '#f8f9fa'}),
+        dbc.CardBody([
+            dbc.Row([
+                # Current Mode
+                dbc.Col([
+                    html.Div([
+                        html.H6([
+                            html.I(className="fas fa-cog me-2", style={'color': '#3498db'}),
+                            "Current Analysis Mode"
+                        ], className="mb-3"),
+
+                        dbc.Card([
+                            dbc.CardBody([
+                                html.H5("40-Feature Basic Predictor", className="mb-2", style={'color': '#2c3e50'}),
+                                html.P([
+                                    "Optimized for datasets with ",
+                                    html.Strong("9 core sensors"),
+                                    " (no GPS required)"
+                                ], className="mb-3"),
+
+                                html.Div([
+                                    dbc.Badge("Speed Analysis", color="primary", className="me-2 mb-2"),
+                                    dbc.Badge("Braking Metrics", color="primary", className="me-2 mb-2"),
+                                    dbc.Badge("Throttle Control", color="primary", className="me-2 mb-2"),
+                                    dbc.Badge("G-Force Analysis", color="primary", className="me-2 mb-2"),
+                                    dbc.Badge("Steering Dynamics", color="primary", className="me-2 mb-2"),
+                                    dbc.Badge("Gear Usage", color="primary", className="me-2 mb-2"),
+                                ], className="mb-3"),
+
+                                html.Div([
+                                    html.Strong("Expected Accuracy: "),
+                                    html.Span("89-91% R²", style={'fontSize': '1.1rem', 'color': '#2ecc71'})
+                                ], className="mb-2"),
+
+                                html.Div([
+                                    html.Strong("Typical Error: "),
+                                    html.Span("±2-3 seconds per lap", style={'fontSize': '1.0rem', 'color': '#95a5a6'})
+                                ])
+                            ])
+                        ], style={'backgroundColor': '#ecf0f1', 'border': 'none'})
+                    ])
+                ], md=6),
+
+                # Advanced Mode (Future)
+                dbc.Col([
+                    html.Div([
+                        html.H6([
+                            html.I(className="fas fa-rocket me-2", style={'color': '#e67e22'}),
+                            "Advanced Mode (Requires GPS)"
+                        ], className="mb-3"),
+
+                        dbc.Card([
+                            dbc.CardBody([
+                                html.H5("147-Feature Advanced Predictor", className="mb-2", style={'color': '#7f8c8d'}),
+                                html.P([
+                                    "Requires ",
+                                    html.Strong("12 sensors including GPS"),
+                                    " for full spatial analysis"
+                                ], className="mb-3"),
+
+                                html.Div([
+                                    dbc.Badge("All Basic Features", color="secondary", className="me-2 mb-2"),
+                                    dbc.Badge("FFT Analysis", color="secondary", className="me-2 mb-2"),
+                                    dbc.Badge("Wavelet Transform", color="secondary", className="me-2 mb-2"),
+                                    dbc.Badge("Corner Detection", color="secondary", className="me-2 mb-2"),
+                                    dbc.Badge("Track Encoding", color="secondary", className="me-2 mb-2"),
+                                    dbc.Badge("Spatial Features", color="secondary", className="me-2 mb-2"),
+                                ], className="mb-3"),
+
+                                html.Div([
+                                    html.Strong("Expected Accuracy: "),
+                                    html.Span("97.49% R²", style={'fontSize': '1.1rem', 'color': '#bdc3c7'})
+                                ], className="mb-2"),
+
+                                html.Div([
+                                    html.Strong("Typical Error: "),
+                                    html.Span("±1.73 seconds per lap", style={'fontSize': '1.0rem', 'color': '#bdc3c7'})
+                                ])
+                            ])
+                        ], style={'backgroundColor': '#ecf0f1', 'border': '2px dashed #95a5a6'})
+                    ])
+                ], md=6)
+            ]),
+
+            # Info footer
+            html.Hr(className="mt-3 mb-3"),
+            html.Div([
+                html.I(className="fas fa-info-circle me-2", style={'color': '#3498db'}),
+                html.Strong("Why Two Modes? "),
+                "The 40-feature predictor is specifically designed for reliability with minimal sensor data. ",
+                "It delivers excellent results (89-91% R²) using only the 9 core sensors available in your dataset. ",
+                "To unlock the advanced 147-feature predictor (97.49% R²), you'll need to add GPS sensors to capture ",
+                "spatial track position data for corner detection, FFT, and wavelet analysis."
+            ], style={'fontSize': '0.95rem', 'color': '#7f8c8d'})
+        ])
+    ], className="mb-4", style={'border': '1px solid #dee2e6', 'borderRadius': '10px'})

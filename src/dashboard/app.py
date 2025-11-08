@@ -41,7 +41,12 @@ try:
     from src.dashboard.weather_widget import create_weather_layout, create_weather_callbacks
     from src.dashboard.sector_widget import create_sector_layout, create_sector_callbacks
     from src.dashboard.animation_widget import create_animation_layout, create_animation_callbacks
-    from src.dashboard.post_race_widget import create_post_race_layout, create_post_race_callbacks
+    from src.dashboard.post_race_widget import (
+        create_post_race_layout,
+        create_post_race_callbacks,
+        create_sensor_status_card,
+        create_ai_model_config_card
+    )
     from src.dashboard.enhanced_driver_insights_widget import create_enhanced_driver_insights_layout
     from src.data_processing.weather_loader import WeatherDataLoader
     from src.data_processing.lap_analysis_loader import LapAnalysisLoader
@@ -94,13 +99,13 @@ logger.info("=" * 80)
 logger.info("DEBUG: ATTEMPTING CHATBOT IMPORT")
 logger.info("=" * 80)
 try:
-    from src.dashboard.chatbot_widget import create_chatbot_layout, create_chatbot_callbacks
+    from src.dashboard.chatbot_modern_widget import create_modern_chatbot_layout as create_chatbot_layout, create_modern_chatbot_callbacks as create_chatbot_callbacks
     CHATBOT_ENABLED = True
-    print("DEBUG: ✓ CHATBOT IMPORT SUCCEEDED - CHATBOT_ENABLED = True")
-    logger.info("✓ Chatbot widget loaded successfully - CHATBOT_ENABLED = True")
+    print("DEBUG: [OK] CHATBOT IMPORT SUCCEEDED - CHATBOT_ENABLED = True")
+    logger.info("[OK] Chatbot widget loaded successfully - CHATBOT_ENABLED = True")
 except ImportError as e:
     CHATBOT_ENABLED = False
-    print(f"DEBUG: ✗ CHATBOT IMPORT FAILED - {e}")
+    print(f"DEBUG: [X] CHATBOT IMPORT FAILED - {e}")
     logger.warning(f"Chatbot widget not available: {e}")
     # Create dummy functions if chatbot is not available
     def create_chatbot_layout():
@@ -109,7 +114,7 @@ except ImportError as e:
         return app
 except Exception as e:
     CHATBOT_ENABLED = False
-    print(f"DEBUG: ✗ CHATBOT IMPORT EXCEPTION - {e}")
+    print(f"DEBUG: [X] CHATBOT IMPORT EXCEPTION - {e}")
     logger.error(f"Chatbot import exception: {e}")
     # Create dummy functions if chatbot is not available
     def create_chatbot_layout():
@@ -166,10 +171,14 @@ _auto_loaded_stats = {
     'avg_time': '--'
 }
 
-# Initialize Dash app with Bootstrap theme
+# Initialize Dash app with Bootstrap theme and custom stylesheets
 app = dash.Dash(
     __name__,
-    external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME],
+    external_stylesheets=[
+        dbc.themes.BOOTSTRAP,
+        dbc.icons.FONT_AWESOME,
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    ],
     title="Racing Analytics Dashboard",
     suppress_callback_exceptions=True
 )
@@ -229,7 +238,7 @@ def load_data_on_startup():
         # Load CSV
         logger.info(f"Loading telemetry data from {data_path}...")
         df = pd.read_csv(data_path)
-        logger.info(f"✅ Loaded {len(df):,} rows from {data_path}")
+        logger.info(f"[OK] Loaded {len(df):,} rows from {data_path}")
 
         # Store data as JSON
         _auto_loaded_data = df.to_json(date_format='iso', orient='split')
@@ -252,7 +261,7 @@ def load_data_on_startup():
             'avg_time': '--'
         }
 
-        logger.info(f"✅ Auto-load complete: {num_samples:,} samples, {num_vehicles} vehicles, {num_laps} laps")
+        logger.info(f"[OK] Auto-load complete: {num_samples:,} samples, {num_vehicles} vehicles, {num_laps} laps")
         return True
 
     except Exception as e:
@@ -265,9 +274,9 @@ if PRODUCTION_MODE:
     logger.info("PRODUCTION MODE: Auto-loading telemetry data...")
     logger.info("="*60)
     if load_data_on_startup():
-        logger.info("✅ Data auto-loaded successfully")
+        logger.info("[OK] Data auto-loaded successfully")
     else:
-        logger.warning("⚠️ Failed to auto-load data, dashboard will start empty")
+        logger.warning("[WARN] Failed to auto-load data, dashboard will start empty")
 
 #================================================================
 # LAYOUT
@@ -590,22 +599,47 @@ def create_dashboard_page():
 
         # Main content container - FULL WIDTH
         dbc.Container([
-            # Dashboard Stats Section - Visual Container
+            # Welcome and Capabilities Section
             dbc.Card([
-                dbc.CardHeader([
-                    html.I(className="fas fa-tachometer-alt me-2"),
-                    "Dashboard Statistics"
-                ], style={'backgroundColor': '#f8f9fa', 'borderBottom': '2px solid #dee2e6'}),
                 dbc.CardBody([
-                    # Stats row - compact
+                    html.H4([
+                        html.I(className="fas fa-rocket me-2", style={'color': '#667eea'}),
+                        "Welcome to GR Cup Racing Analytics"
+                    ], className="mb-3"),
+                    html.P([
+                        "Professional-grade telemetry analysis powered by ",
+                        html.Strong("97.49% accuracy AI"),
+                        " trained on 18.5GB of racing data. ",
+                        "This dashboard provides comprehensive insights into driver performance, lap times, and vehicle dynamics."
+                    ], className="mb-3", style={'fontSize': '1.05rem'}),
+
+                    html.H6("Dashboard Capabilities:", className="mb-2 fw-bold"),
                     dbc.Row([
-                        dbc.Col(create_stat_card("Samples", html.Span(id='stat-samples', children="0"), "database", "#17a2b8"), md=3),
-                        dbc.Col(create_stat_card("Vehicles", html.Span(id='stat-vehicles', children="0"), "car", "#28a745"), md=3),
-                        dbc.Col(create_stat_card("Laps", html.Span(id='stat-laps', children="0"), "flag", "#ffc107"), md=3),
-                        dbc.Col(create_stat_card("Avg Time", html.Span(id='stat-avg-time', children="--"), "clock", "#dc3545"), md=3),
-                    ]),
-                ], style={'padding': '1rem'}),
-            ], className="mb-4", style={'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'}),
+                        dbc.Col([
+                            html.Ul([
+                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Real-time telemetry analysis (10Hz sensor data)"]),
+                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "AI-powered lap time predictions (±1.73s accuracy)"]),
+                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Multi-dimensional pattern detection (WHAT × WHERE × WHEN)"]),
+                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Advanced signal processing (FFT & wavelet analysis)"]),
+                            ], className="mb-0", style={'listStyle': 'none', 'paddingLeft': '0'})
+                        ], md=6),
+                        dbc.Col([
+                            html.Ul([
+                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Personalized coaching recommendations"]),
+                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Track-specific insights across 6 circuits"]),
+                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Comparative performance benchmarking"]),
+                                html.Li([html.I(className="fas fa-check-circle me-2 text-success"), "Interactive visualizations and animations"]),
+                            ], className="mb-0", style={'listStyle': 'none', 'paddingLeft': '0'})
+                        ], md=6),
+                    ])
+                ], style={'padding': '1.5rem', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px'})
+            ], className="mb-4", style={'border': '1px solid #dee2e6', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'}),
+
+            # Sensor Status Card (imported from post_race_widget)
+            create_sensor_status_card() if WEEK1_ENABLED else html.Div(),
+
+            # AI Model Configuration Card (imported from post_race_widget)
+            create_ai_model_config_card() if WEEK1_ENABLED else html.Div(),
 
             # Analysis Tabs Section - Visual Container
             dbc.Card([
@@ -614,6 +648,32 @@ def create_dashboard_page():
                     "Analysis Tools"
                 ], style={'backgroundColor': '#f8f9fa', 'borderBottom': '2px solid #dee2e6'}),
                 dbc.CardBody([
+                    # Vehicle selector - moved from footer to tab container
+                    dbc.Row([
+                        dbc.Col([
+                            html.Label([
+                                html.I(className="fas fa-car me-2"),
+                                "Select Vehicle"
+                            ], className="fw-bold mb-2"),
+                            dcc.Dropdown(
+                                id='vehicle-dropdown-display',
+                                placeholder="Select vehicle number...",
+                                className="mb-3"
+                            )
+                        ], md=6),
+                        dbc.Col([
+                            html.Div([
+                                html.Span("Data loaded: ", className="fw-bold"),
+                                html.Span(id='stat-samples', children="0"),
+                                html.Span(" samples, ", className="text-muted"),
+                                html.Span(id='stat-vehicles', children="0"),
+                                html.Span(" vehicles, ", className="text-muted"),
+                                html.Span(id='stat-laps', children="0"),
+                                html.Span(" laps", className="text-muted")
+                            ], style={'padding': '0.5rem', 'marginTop': '1.8rem'})
+                        ], md=6)
+                    ], className="mb-3"),
+
                     # FULL WIDTH TABS - Maximum space for visualizations
                     dbc.Row([
                         dbc.Col([
@@ -652,76 +712,15 @@ def create_dashboard_page():
             })
         ], id="chatbot-container"),
 
-        # FOOTER - Upload and vehicle selection in compact horizontal layout
-        html.Footer([
-            dbc.Container([
-                dbc.Card([
-                    dbc.CardBody([
-                        dbc.Row([
-                            # Upload section - compact
-                            dbc.Col([
-                                html.Label([
-                                    html.I(className="fas fa-upload me-2"),
-                                    "Upload Telemetry"
-                                ], className="fw-bold mb-2"),
-                                dcc.Upload(
-                                    id='upload-telemetry',
-                                    children=html.Div([
-                                        html.I(className="fas fa-cloud-upload-alt me-2"),
-                                        'Drag/Drop or ',
-                                        html.A('Select CSV', style={'color': '#007bff', 'cursor': 'pointer'})
-                                    ]),
-                                    style={
-                                        'width': '100%',
-                                        'height': '60px',
-                                        'lineHeight': '60px',
-                                        'borderWidth': '2px',
-                                        'borderStyle': 'dashed',
-                                        'borderRadius': '5px',
-                                        'textAlign': 'center',
-                                        'background': '#f8f9fa',
-                                        'fontSize': '14px'
-                                    },
-                                    multiple=False
-                                ),
-                                html.Div(id='upload-status', className="mt-2", style={'fontSize': '12px'}),
-                            ], md=6),
-
-                            # Vehicle selection - compact
-                            dbc.Col([
-                                html.Label([
-                                    html.I(className="fas fa-car me-2"),
-                                    "Select Vehicle"
-                                ], className="fw-bold mb-2"),
-                                dcc.Dropdown(
-                                    id='vehicle-dropdown',
-                                    placeholder="Select vehicle number...",
-                                    className="mb-2",
-                                    style={'fontSize': '14px'}
-                                ),
-                                dbc.Button(
-                                    [html.I(className="fas fa-chart-line me-2"), "Analyze"],
-                                    id='analyze-button',
-                                    color="primary",
-                                    size="sm",
-                                    className="w-100",
-                                    disabled=True
-                                ),
-                            ], md=6),
-                        ], align="center")
-                    ], style={'padding': '1rem'})
-                ], className="shadow-sm")
-            ], fluid=True)
-        ], style={
-            'position': 'fixed',
-            'bottom': '0',
-            'left': '0',
-            'right': '0',
-            'background': 'white',
-            'borderTop': '2px solid #dee2e6',
-            'zIndex': '1000',
-            'padding': '0.5rem 0'
-        }),
+        # Vehicle selector and hidden components (moved from footer)
+        html.Div([
+            # Hidden vehicle dropdown for callbacks
+            dcc.Dropdown(id='vehicle-dropdown', style={'display': 'none'}),
+            dbc.Button(id='analyze-button', style={'display': 'none'}),
+            html.Div(id='upload-status', style={'display': 'none'}),
+            # Hidden upload for development mode compatibility
+            dcc.Upload(id='upload-telemetry', style={'display': 'none'})
+        ], style={'display': 'none'}),
 
         # Corner Analysis Modal - Must exist in base layout for callbacks (Sprint 2 Task 3)
         # Fixed structure: only content areas are updated, close button always exists
@@ -751,12 +750,29 @@ if PRODUCTION_MODE:
         # Store for telemetry data (populated from auto-loaded data)
         dcc.Store(id='upload-data', data=_auto_loaded_data),
 
+        # Theme state storage
+        dcc.Store(id='theme-state', storage_type='local', data='light'),
+
         # Tour state storage
         dcc.Store(id='tour-state', data={
             'welcome_shown': False,
             'tour_completed': False,
             'dont_show_again': False
         }),
+
+        # Processing indicator overlay
+        html.Div([
+            dbc.Spinner(color="primary", size="lg"),
+            html.Span("Loading...", style={'fontSize': '1.2rem', 'marginLeft': '1rem'})
+        ], id="processing-overlay", className="processing-overlay", style={'display': 'none'}),
+
+        # Theme toggle button
+        dbc.Button(
+            html.I(id="theme-icon", className="fas fa-moon"),
+            id="theme-toggle",
+            className="theme-toggle-btn",
+            title="Toggle Light/Dark Mode"
+        ),
 
         # Show dashboard directly (no upload page)
         create_dashboard_page(),
@@ -767,24 +783,7 @@ if PRODUCTION_MODE:
         # Add help documentation system
         create_help_button(),
         create_help_documentation_modal(),
-
-        # CHATBOT WIDGET - Floating panel on right side
-        html.Div([
-            html.Div([
-                create_chatbot_layout()
-            ], style={
-                'position': 'fixed',
-                'right': '20px',
-                'bottom': '220px',
-                'width': '400px',
-                'maxHeight': '600px',
-                'zIndex': '999',
-                'boxShadow': '0 4px 12px rgba(0,0,0,0.15)',
-                'borderRadius': '0.5rem',
-                'overflow': 'hidden'
-            })
-        ], id="chatbot-container")
-    ])
+    ], id="main-app-container")
 else:
     # Development mode: Keep two-page flow with manual upload
     app.layout = html.Div([
@@ -1383,14 +1382,14 @@ def render_predictions(df, vehicle_number):
             # Analyze patterns
             patterns_data = analyzer.analyze_telemetry(df, use_cache=True)
             if patterns_data and len(patterns_data) > 0:
-                logger.info(f"✅ Cube analysis complete: {len(patterns_data)} patterns detected")
+                logger.info(f"[OK] Cube analysis complete: {len(patterns_data)} patterns detected")
             else:
                 logger.info("No patterns detected in telemetry")
 
             # Analyze corners (Sprint 2 Task 5)
             corner_analyses = analyzer.analyze_corners(df, use_cache=True)
             if corner_analyses and len(corner_analyses) > 0:
-                logger.info(f"✅ Corner analysis complete: {len(corner_analyses)} corners detected")
+                logger.info(f"[OK] Corner analysis complete: {len(corner_analyses)} corners detected")
                 # Store globally for corner analysis callback access
                 global _cached_corner_analyses
                 _cached_corner_analyses = corner_analyses
@@ -2122,18 +2121,18 @@ logger.info("=" * 80)
 logger.info(f"DEBUG: CHATBOT CALLBACK REGISTRATION - CHATBOT_ENABLED = {CHATBOT_ENABLED}")
 logger.info("=" * 80)
 if CHATBOT_ENABLED:
-    print("DEBUG: ✓ CHATBOT_ENABLED is True, registering callbacks...")
-    logger.info("DEBUG: ✓ CHATBOT_ENABLED is True, registering callbacks...")
+    print("DEBUG: [OK] CHATBOT_ENABLED is True, registering callbacks...")
+    logger.info("DEBUG: [OK] CHATBOT_ENABLED is True, registering callbacks...")
     try:
         create_chatbot_callbacks(app)
-        print("DEBUG: ✓ CHATBOT CALLBACKS REGISTERED SUCCESSFULLY")
-        logger.info("✓ Chatbot callbacks registered successfully")
+        print("DEBUG: [OK] CHATBOT CALLBACKS REGISTERED SUCCESSFULLY")
+        logger.info("[OK] Chatbot callbacks registered successfully")
     except Exception as e:
-        print(f"DEBUG: ✗ CHATBOT CALLBACK REGISTRATION FAILED - {e}")
+        print(f"DEBUG: [X] CHATBOT CALLBACK REGISTRATION FAILED - {e}")
         logger.error(f"Failed to register chatbot callbacks: {e}")
 else:
-    print("DEBUG: ✗ CHATBOT_ENABLED is False, skipping callback registration")
-    logger.info("DEBUG: ✗ CHATBOT_ENABLED is False, skipping callback registration")
+    print("DEBUG: [X] CHATBOT_ENABLED is False, skipping callback registration")
+    logger.info("DEBUG: [X] CHATBOT_ENABLED is False, skipping callback registration")
 print("=" * 80)
 
 #================================================================
@@ -2191,6 +2190,75 @@ def handle_welcome_modal(start_clicks, skip_clicks, upload_data, tour_state, don
         return False, tour_state
 
     return False, tour_state
+
+#================================================================
+# THEME TOGGLE AND UI ENHANCEMENTS
+#================================================================
+
+@app.callback(
+    [Output('main-app-container', 'data-theme'),
+     Output('theme-icon', 'className'),
+     Output('theme-state', 'data')],
+    Input('theme-toggle', 'n_clicks'),
+    State('theme-state', 'data'),
+    prevent_initial_call=True
+)
+def toggle_theme(n_clicks, current_theme):
+    """Toggle between light and dark theme"""
+    if not n_clicks:
+        return 'light', 'fas fa-moon', 'light'
+
+    new_theme = 'dark' if current_theme == 'light' else 'light'
+    icon_class = 'fas fa-sun' if new_theme == 'dark' else 'fas fa-moon'
+
+    return new_theme, icon_class, new_theme
+
+
+@app.callback(
+    Output('processing-overlay', 'style'),
+    Input('tabs', 'active_tab'),
+    prevent_initial_call=True
+)
+def show_processing_indicator(active_tab):
+    """Show processing indicator when switching tabs"""
+    # Show overlay briefly (CSS handles the display)
+    # This will trigger, then the actual tab content loads
+    # We'll hide it again when tab content is ready
+    return {'display': 'flex'}
+
+
+@app.callback(
+    Output('processing-overlay', 'style', allow_duplicate=True),
+    Input('tab-content', 'children'),
+    prevent_initial_call=True
+)
+def hide_processing_indicator(content):
+    """Hide processing indicator when tab content is loaded"""
+    return {'display': 'none'}
+
+
+# Sync vehicle dropdown value (display <-> hidden)
+@app.callback(
+    Output('vehicle-dropdown', 'value'),
+    Input('vehicle-dropdown-display', 'value'),
+    prevent_initial_call=True
+)
+def sync_vehicle_dropdown_value(selected_vehicle):
+    """Synchronize the displayed vehicle dropdown value with the hidden one"""
+    return selected_vehicle
+
+
+@app.callback(
+    Output('vehicle-dropdown-display', 'options'),
+    Input('upload-data', 'data'),
+    prevent_initial_call=False
+)
+def update_vehicle_dropdown_display_options(data_json):
+    """Update vehicle dropdown options when data is loaded"""
+    if data_json and _auto_loaded_stats:
+        return _auto_loaded_stats['vehicle_options']
+    return []
+
 
 #================================================================
 # RUN APPLICATION

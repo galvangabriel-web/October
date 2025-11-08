@@ -33,7 +33,7 @@ CHATBOT_HEALTH_URL = f"{CHATBOT_API_BASE}/api/health"
 
 def create_chatbot_layout():
     """
-    Create the chatbot widget layout
+    Create the chatbot widget layout with improved typography and draggable/resizable features
 
     Returns:
         dbc.Card: Chatbot interface card
@@ -42,13 +42,15 @@ def create_chatbot_layout():
         dbc.CardHeader([
             html.Div([
                 html.I(className="fas fa-robot me-2"),
-                html.Span("AI Racing Assistant", className="fw-bold"),
+                html.Span("AI Racing Assistant", className="fw-bold", style={'fontSize': '1.1rem'}),
                 html.Span(
                     id="chatbot-status-indicator",
                     className="badge bg-secondary ms-2",
                     children="Connecting..."
-                )
-            ], className="d-flex align-items-center")
+                ),
+                html.I(className="fas fa-arrows-alt ms-auto", title="Drag to move",
+                       style={'cursor': 'move', 'opacity': '0.6'}, id="chatbot-drag-handle")
+            ], className="d-flex align-items-center", style={'padding': '0.75rem 1rem'})
         ]),
         dbc.CardBody([
             # Chat messages container
@@ -138,7 +140,7 @@ def create_chatbot_layout():
         # Hidden stores
         dcc.Store(id="chatbot-conversation-history", data=[]),
         dcc.Interval(id="chatbot-health-check", interval=30000, n_intervals=0)  # Check every 30s
-    ], className="mb-3")
+    ], className="mb-3", id="chatbot-card")
 
 
 def create_chatbot_callbacks(app):
@@ -149,10 +151,10 @@ def create_chatbot_callbacks(app):
         app: Dash application instance
     """
 
-    # Health check callback
+    # Simplified health check callback (no model info)
     @app.callback(
-        Output("chatbot-status-indicator", "children"),
-        Output("chatbot-status-indicator", "className"),
+        [Output("chatbot-status-indicator", "children"),
+         Output("chatbot-status-indicator", "className")],
         Input("chatbot-health-check", "n_intervals")
     )
     def update_health_status(n):
