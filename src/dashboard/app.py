@@ -24,6 +24,8 @@ import requests
 import logging
 from PIL import Image
 import json
+from datetime import datetime
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +49,8 @@ try:
         create_sensor_status_card,
         create_ai_model_config_card
     )
+    from src.dashboard.post_race_x_widget import create_post_race_x_layout, create_post_race_x_callbacks
+    from src.dashboard.data_structure_widget import create_data_structure_layout
     from src.dashboard.enhanced_driver_insights_widget import create_enhanced_driver_insights_layout
     from src.data_processing.weather_loader import WeatherDataLoader
     from src.data_processing.lap_analysis_loader import LapAnalysisLoader
@@ -170,6 +174,7 @@ _auto_loaded_stats = {
     'num_laps': 0,
     'avg_time': '--'
 }
+_last_update_time = None  # Timestamp of last data load
 
 # Initialize Dash app with Bootstrap theme and custom stylesheets
 app = dash.Dash(
@@ -211,7 +216,7 @@ def load_data_on_startup():
     Returns:
         bool: True if data loaded successfully, False otherwise
     """
-    global _auto_loaded_data, _auto_loaded_stats
+    global _auto_loaded_data, _auto_loaded_stats, _last_update_time
 
     if not PRODUCTION_MODE:
         logger.info("Production mode disabled, skipping auto-load")
@@ -262,6 +267,10 @@ def load_data_on_startup():
         }
 
         logger.info(f"[OK] Auto-load complete: {num_samples:,} samples, {num_vehicles} vehicles, {num_laps} laps")
+        
+        # Track last update time
+        _last_update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
         return True
 
     except Exception as e:
@@ -292,6 +301,16 @@ navbar = dbc.Navbar(
         dbc.Nav([
             dbc.NavItem(dbc.NavLink("Dashboard", href="#")),
             dbc.NavItem(dbc.NavLink("API Docs", href=f"{API_BASE}/docs", target="_blank")),
+            dbc.NavItem(html.Div([
+                html.Small(id="last-update-display", className="text-light me-3", style={'lineHeight': '40px'}),
+                dbc.Button(
+                    [html.I(className="fas fa-sync-alt me-2"), "Refresh Data"],
+                    id="refresh-data-button",
+                    color="success",
+                    size="sm",
+                    className="me-2"
+                )
+            ], className="d-flex align-items-center"))
         ], className="ms-auto", navbar=True),
     ], fluid=True),
     color="dark",
@@ -1015,6 +1034,7 @@ def create_dashboard_page():
                             dbc.Tabs([
                                 dbc.Tab(label="Driver Insights", tab_id="tab-insights", label_style={"cursor": "pointer"}),
                                 dbc.Tab(label="Post-Race Analysis", tab_id="tab-post-race", label_style={"cursor": "pointer"}),
+                                dbc.Tab(label="Post-Race-X Analysis", tab_id="tab-post-race-x", label_style={"cursor": "pointer"}),
                                 dbc.Tab(label="Telemetry Charts", tab_id="tab-telemetry", label_style={"cursor": "pointer"}),
                                 dbc.Tab(label="Model Predictions", tab_id="tab-predictions", label_style={"cursor": "pointer"}),
                                 dbc.Tab(label="Track Maps", tab_id="tab-track-maps", label_style={"cursor": "pointer"}),
@@ -1022,6 +1042,7 @@ def create_dashboard_page():
                                 dbc.Tab(label="Sector Benchmarking", tab_id="tab-sectors", label_style={"cursor": "pointer"}),
                                 dbc.Tab(label="Championships", tab_id="tab-championships", label_style={"cursor": "pointer"}),
                                 dbc.Tab(label="Track Animation", tab_id="tab-animation", label_style={"cursor": "pointer"}),
+                                dbc.Tab(label="Data Structure", tab_id="tab-data-structure", label_style={"cursor": "pointer"}),
                             ], id="tabs", active_tab="tab-insights", className="mb-3"),
                             html.Div(id="tab-content", style={'min-height': '70vh'})  # Minimum height for content
                         ], width=12),
@@ -1085,6 +1106,17 @@ if PRODUCTION_MODE:
         # Store for telemetry data (populated from auto-loaded data)
         dcc.Store(id='upload-data', data=_auto_loaded_data),
 
+        # Global post-race analysis data store (shared across Post-Race and Post-Race-X tabs)
+        # Structure: {'predictions': JSON, 'features_by_vehicle': {vehicle: {feature: value}}}
+        dcc.Store(id='post-race-data-store'),
+
+        # Auto-refresh interval (checks for data updates every 5 minutes)
+        dcc.Interval(
+            id='data-refresh-interval',
+            interval=5*60*1000,  # 5 minutes in milliseconds
+            n_intervals=0
+        ),
+
         # Theme state storage
         dcc.Store(id='theme-state', storage_type='local', data='light'),
 
@@ -1127,6 +1159,17 @@ else:
 
         # Store to persist uploaded telemetry data across page switches
         dcc.Store(id='upload-data'),
+
+        # Global post-race analysis data store (shared across Post-Race and Post-Race-X tabs)
+        # Structure: {'predictions': JSON, 'features_by_vehicle': {vehicle: {feature: value}}}
+        dcc.Store(id='post-race-data-store'),
+
+        # Auto-refresh interval (checks for data updates every 5 minutes)
+        dcc.Interval(
+            id='data-refresh-interval',
+            interval=5*60*1000,  # 5 minutes in milliseconds
+            n_intervals=0
+        ),
 
         # Tour state storage
         dcc.Store(id='tour-state', data={
@@ -1305,8 +1348,8 @@ def render_tab_content(active_tab, n_clicks, vehicle_number, data_json):
     import datetime
     logger.info(f"[{datetime.datetime.now()}] Callback triggered - Tab: {active_tab}, Vehicle: {vehicle_number}")
 
-    # Week 1 tabs, animation tab, and post-race tab don't require telemetry upload
-    if active_tab in ["tab-weather", "tab-sectors", "tab-championships", "tab-animation", "tab-post-race"]:
+    # Week 1 tabs, animation tab, and post-race tabs don't require telemetry upload
+    if active_tab in ["tab-weather", "tab-sectors", "tab-championships", "tab-animation", "tab-post-race", "tab-post-race-x", "tab-data-structure"]:
         if active_tab == "tab-animation":
             # Animation tab has its own upload mechanism
             return create_animation_layout()
@@ -1314,6 +1357,14 @@ def render_tab_content(active_tab, n_clicks, vehicle_number, data_json):
         if active_tab == "tab-post-race":
             # Post-Race Analysis tab has its own upload mechanism
             return create_post_race_layout()
+
+        if active_tab == "tab-post-race-x":
+            # Post-Race-X Analysis tab
+            return create_post_race_x_layout()
+
+        if active_tab == "tab-data-structure":
+            # Data Structure tab
+            return create_data_structure_layout()
 
         if not WEEK1_ENABLED:
             return dbc.Alert("Week 1 features not available. Missing data loaders.", color="warning")
@@ -2438,6 +2489,13 @@ if WEEK1_ENABLED:
     except Exception as e:
         logger.error(f"Failed to register post-race analysis callbacks: {e}")
 
+    # Register post-race-x analysis callbacks
+    try:
+        create_post_race_x_callbacks(app)
+        logger.info("Post-race-x analysis callbacks registered")
+    except Exception as e:
+        logger.error(f"Failed to register post-race-x analysis callbacks: {e}")
+
     # Register help documentation callbacks
     try:
         create_help_callbacks(app)
@@ -2595,6 +2653,109 @@ def update_vehicle_dropdown_display_options(data_json):
 #================================================================
 # RUN APPLICATION
 #================================================================
+
+
+#================================================================
+# DATA REFRESH CALLBACK (Auto & Manual)
+#================================================================
+
+@app.callback(
+    [Output('upload-data', 'data'),
+     Output('last-update-display', 'children'),
+     Output('vehicle-dropdown', 'options', allow_duplicate=True),
+     Output('stat-samples', 'children', allow_duplicate=True),
+     Output('stat-vehicles', 'children', allow_duplicate=True),
+     Output('stat-laps', 'children', allow_duplicate=True)],
+    [Input('data-refresh-interval', 'n_intervals'),
+     Input('refresh-data-button', 'n_clicks')],
+    prevent_initial_call=True
+)
+def refresh_telemetry_data(n_intervals, n_clicks):
+    """
+    Refresh telemetry data from CSV file.
+
+    Triggered by:
+    - Auto-refresh interval (every 5 minutes)
+    - Manual refresh button click
+
+    Returns updated data and statistics.
+    """
+    global _auto_loaded_data, _auto_loaded_stats, _last_update_time
+
+    try:
+        # Check if running on Windows (development) or Linux (production)
+        import platform
+        is_windows = platform.system() == 'Windows'
+
+        # Use local path for Windows development, server path for Linux production
+        if is_windows:
+            data_path = Path(__file__).parent.parent.parent / "master_racing_data.csv"
+        else:
+            data_path = Path(DATA_FILE_PATH)
+
+        # Check if file exists
+        if not data_path.exists():
+            logger.warning(f"Data file not found during refresh: {data_path}")
+            return (
+                _auto_loaded_data,
+                f"⚠️ Last update: {_last_update_time or 'N/A'} (File not found)",
+                _auto_loaded_stats['vehicle_options'],
+                f"{_auto_loaded_stats['num_samples']:,}",
+                str(_auto_loaded_stats['num_vehicles']),
+                str(_auto_loaded_stats['num_laps'])
+            )
+
+        # Load CSV
+        logger.info(f"[REFRESH] Loading telemetry data from {data_path}...")
+        df = pd.read_csv(data_path)
+        logger.info(f"[REFRESH] Loaded {len(df):,} rows")
+
+        # Store data as JSON
+        _auto_loaded_data = df.to_json(date_format='iso', orient='split')
+
+        # Calculate statistics
+        num_samples = len(df)
+        vehicles = sorted(df['vehicle_number'].unique()) if 'vehicle_number' in df.columns else []
+        num_vehicles = len(vehicles)
+        num_laps = df['lap'].nunique() if 'lap' in df.columns else 0
+
+        # Create vehicle dropdown options
+        vehicle_options = [{'label': f'Vehicle #{v}', 'value': v} for v in vehicles]
+
+        # Update stats
+        _auto_loaded_stats = {
+            'num_samples': num_samples,
+            'vehicle_options': vehicle_options,
+            'num_vehicles': num_vehicles,
+            'num_laps': num_laps,
+            'avg_time': '--'
+        }
+
+        # Update timestamp
+        _last_update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        logger.info(f"[REFRESH] Data refreshed successfully: {num_samples:,} samples, {num_vehicles} vehicles, {num_laps} laps")
+
+        return (
+            _auto_loaded_data,
+            f"✓ Last update: {_last_update_time}",
+            vehicle_options,
+            f"{num_samples:,}",
+            str(num_vehicles),
+            str(num_laps)
+        )
+
+    except Exception as e:
+        logger.error(f"[REFRESH] Failed to refresh data: {e}", exc_info=True)
+        return (
+            _auto_loaded_data,
+            f"⚠️ Last update: {_last_update_time or 'N/A'} (Refresh failed)",
+            _auto_loaded_stats['vehicle_options'],
+            f"{_auto_loaded_stats['num_samples']:,}",
+            str(_auto_loaded_stats['num_vehicles']),
+            str(_auto_loaded_stats['num_laps'])
+        )
+
 
 if __name__ == '__main__':
     print("\n" + "="*60)
