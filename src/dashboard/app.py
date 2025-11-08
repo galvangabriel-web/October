@@ -1187,7 +1187,6 @@ if PRODUCTION_MODE:
          Output('stat-samples', 'children'),
          Output('stat-vehicles', 'children'),
          Output('stat-laps', 'children'),
-         Output('stat-avg-time', 'children'),
          Output('analyze-button', 'disabled')],
         [Input('upload-data', 'data')],  # Triggers when page loads with auto-loaded data
         prevent_initial_call=False
@@ -1196,7 +1195,7 @@ if PRODUCTION_MODE:
         """Populate dashboard stats from auto-loaded data (Production Mode)"""
         if data_json is None or not _auto_loaded_stats:
             # No data loaded
-            return ([], "0", "0", "0", "--", True)
+            return ([], "0", "0", "0", True)
 
         # Use pre-calculated stats from auto-load
         return (
@@ -1204,7 +1203,6 @@ if PRODUCTION_MODE:
             f"{_auto_loaded_stats['num_samples']:,}",
             str(_auto_loaded_stats['num_vehicles']),
             str(_auto_loaded_stats['num_laps']),
-            _auto_loaded_stats['avg_time'],
             False  # Enable analyze button
         )
 
@@ -1217,7 +1215,6 @@ if not PRODUCTION_MODE:
          Output('stat-samples', 'children'),
          Output('stat-vehicles', 'children'),
          Output('stat-laps', 'children'),
-         Output('stat-avg-time', 'children'),
          Output('analyze-button', 'disabled'),
          Output('show-dashboard', 'data')],  # Add output to switch to dashboard
         [Input('upload-telemetry', 'contents')],
@@ -1226,7 +1223,7 @@ if not PRODUCTION_MODE:
     def handle_upload(contents, filename):
         """Handle telemetry file upload (Development Mode Only)"""
         if contents is None:
-            return ("", "", [], "0", "0", "0", "--", True, False)  # Stay on upload page
+            return ("", "", [], "0", "0", "0", True, False)  # Stay on upload page
 
         try:
             # Decode uploaded file
