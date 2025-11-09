@@ -43,6 +43,132 @@ RADAR_FEATURES = ['avg_speed', 'max_brake_f', 'full_throttle_pct', 'max_lateral_
 
 
 # ============================================================================
+# DYNAMIC ADVICE GENERATION
+# ============================================================================
+
+def generate_personalized_advice(vehicle_features: dict, all_vehicles_features: dict) -> tuple:
+    """
+    Generate personalized Pro Tip based on vehicle's specific performance data.
+
+    Analyzes the vehicle's features against track averages and identifies
+    the top 3 weakest high-impact areas to provide actionable advice.
+
+    Args:
+        vehicle_features: Dict of feature values for the selected vehicle
+        all_vehicles_features: Dict of {vehicle_id: features} for all vehicles
+
+    Returns:
+        tuple: (tip_text, feature_name, improvement_pct)
+            - tip_text: Personalized advice string
+            - feature_name: The top improvement area
+            - improvement_pct: Percentage below track average
+    """
+    if not vehicle_features or not all_vehicles_features:
+        return ("Select a vehicle to see personalized advice based on data analysis.", None, None)
+
+    # Calculate track averages for all features
+    track_averages = {}
+    for feature_key in vehicle_features.keys():
+        if feature_key in FEATURE_METADATA:
+            values = [v.get(feature_key, 0) for v in all_vehicles_features.values() if feature_key in v]
+            if values:
+                track_averages[feature_key] = np.mean(values)
+
+    # Identify high-impact features where vehicle is below average
+    weaknesses = []
+
+    for feature_key, vehicle_value in vehicle_features.items():
+        if feature_key not in FEATURE_METADATA:
+            continue
+
+        metadata = FEATURE_METADATA[feature_key]
+        impact = metadata['impact']
+
+        # Only analyze Very High and High impact features
+        if impact not in ['Very High', 'High']:
+            continue
+
+        if feature_key not in track_averages:
+            continue
+
+        track_avg = track_averages[feature_key]
+
+        # Skip if no meaningful average
+        if track_avg == 0:
+            continue
+
+        # Calculate percentage difference from average
+        # For features where HIGHER is better (most features)
+        higher_is_better = feature_key not in ['brake_variance', 'steering_variance',
+                                                'speed_variance', 'brake_count']
+
+        if higher_is_better:
+            diff_pct = ((vehicle_value - track_avg) / track_avg) * 100
+            if diff_pct < -5:  # More than 5% below average
+                weaknesses.append({
+                    'feature': feature_key,
+                    'metadata': metadata,
+                    'value': vehicle_value,
+                    'avg': track_avg,
+                    'diff_pct': diff_pct,
+                    'higher_is_better': True
+                })
+        else:
+            # For variance features, LOWER is better
+            diff_pct = ((track_avg - vehicle_value) / track_avg) * 100
+            if diff_pct < -5:  # Vehicle is more than 5% worse (higher variance)
+                weaknesses.append({
+                    'feature': feature_key,
+                    'metadata': metadata,
+                    'value': vehicle_value,
+                    'avg': track_avg,
+                    'diff_pct': diff_pct,
+                    'higher_is_better': False
+                })
+
+    # Sort by biggest weakness (most negative diff_pct)
+    weaknesses.sort(key=lambda x: x['diff_pct'])
+
+    # Generate advice based on top weaknesses
+    if not weaknesses:
+        return ("Excellent! Your performance is at or above track average in all high-impact areas. "
+                "Focus on consistency and fine-tuning your technique.", None, None)
+
+    top_weakness = weaknesses[0]
+    feature_name = top_weakness['metadata']['name']
+    diff_pct = abs(top_weakness['diff_pct'])
+
+    # Generate specific advice based on the feature
+    advice_map = {
+        'full_throttle_pct': f"Your throttle application is {diff_pct:.1f}% below average. Work on maximizing throttle time by carrying more speed through corners and getting on power earlier at apex.",
+        'max_lateral_g': f"Your cornering g-forces are {diff_pct:.1f}% below average. Focus on building more corner speed by taking smoother, wider lines and maintaining higher minimum speeds.",
+        'min_corner_speed': f"Your minimum corner speeds are {diff_pct:.1f}% below average. Try carrying 2-3 km/h more speed into corners by braking earlier and releasing brakes progressively.",
+        'trail_braking_pct': f"Your trail braking usage is {diff_pct:.1f}% below average. Practice extending brake application deeper into corner entry to rotate the car and improve turn-in.",
+        'avg_speed': f"Your average speed is {diff_pct:.1f}% below average. Focus on maintaining momentum through corners and minimizing time off throttle.",
+        'hard_brake_pct': f"Your hard braking zones are {diff_pct:.1f}% shorter than average. Consider braking harder and later into key corners to maximize braking performance.",
+        'max_brake_f': f"Your peak brake pressure is {diff_pct:.1f}% below average. Work on brake pedal confidence - apply maximum pressure quickly, then release progressively.",
+        'accel_time_pct': f"You're spending {diff_pct:.1f}% less time accelerating than average. Focus on getting to full throttle earlier by optimizing your corner exit lines.",
+        'brake_transition_smoothness': f"Your brake modulation is {diff_pct:.1f}% less smooth than average. Practice progressive brake release to maintain stability and grip through corner entry.",
+        'driving_smoothness': f"Your overall driving smoothness is {diff_pct:.1f}% below average. Focus on gentle, progressive inputs for steering, brake, and throttle to maintain tire grip.",
+    }
+
+    # Get specific advice or use generic
+    tip_text = advice_map.get(
+        top_weakness['feature'],
+        f"Your {feature_name} is {diff_pct:.1f}% below track average. "
+        f"This is a high-impact area - small improvements here will yield significant lap time gains."
+    )
+
+    # Add secondary advice if multiple weaknesses
+    if len(weaknesses) >= 2:
+        second_weakness = weaknesses[1]
+        second_name = second_weakness['metadata']['name']
+        tip_text += f" Also focus on {second_name} for additional gains."
+
+    return (tip_text, feature_name, diff_pct)
+
+
+# ============================================================================
 # FEATURE METADATA
 # ============================================================================
 # Comprehensive metadata for all 46 engineered features from TelemetryFeatureEngineer
@@ -145,18 +271,20 @@ def create_post_race_x_layout():
                 ], className="mb-0")
             ], style={'backgroundColor': '#f8f9fa'}),
             dbc.CardBody([
-                html.P("Load pre-computed feature data from 2,587 laps across 5 tracks:", className="mb-3"),
+                html.P("Load pre-computed feature data from 4,148 laps across 7 tracks:", className="mb-3"),
 
                 dbc.Row([
                     dbc.Col([
                         dcc.Dropdown(
                             id='post-race-x-track-selector',
                             options=[
-                                {'label': '🏁 Barber Motorsports Park (466 laps)', 'value': 'barber-motorsports-park'},
-                                {'label': '🏁 Circuit of the Americas (643 laps)', 'value': 'circuit-of-the-americas'},
-                                {'label': '🏁 Road America (367 laps)', 'value': 'road-america'},
-                                {'label': '🏁 Sonoma Raceway (747 laps)', 'value': 'sonoma'},
-                                {'label': '🏁 Virginia International Raceway (364 laps)', 'value': 'virginia-international-raceway'},
+                                {'label': '🏁 Indianapolis Motor Speedway (1,349 laps)', 'value': 'indianapolis_motor_speedway'},
+                                {'label': '🏁 Sonoma Raceway (793 laps)', 'value': 'sonoma'},
+                                {'label': '🏁 Circuit of the Americas (651 laps)', 'value': 'circuit_of_the_americas'},
+                                {'label': '🏁 Barber Motorsports Park (466 laps)', 'value': 'barber_motorsports_park'},
+                                {'label': '🏁 Road America (367 laps)', 'value': 'road_america'},
+                                {'label': '🏁 Virginia International Raceway (364 laps)', 'value': 'virginia_international_raceway'},
+                                {'label': '🏁 Sebring International Raceway (158 laps)', 'value': 'sebring'},
                             ],
                             placeholder="Select a track to load features...",
                             className="mb-2"
@@ -504,8 +632,13 @@ def create_post_race_x_callbacks(app):
                 vehicle_data = track_data[track_data['vehicle_number'] == vehicle]
 
                 # Get average features across all laps for this vehicle
+                # Exclude metadata and string columns
+                exclude_cols = ['vehicle_number', 'lap_number', 'race', 'track',
+                              'DRIVER_FIRSTNAME', 'DRIVER_SECONDNAME', 'STATUS', 'TEAM',
+                              'TOTAL_TIME', 'GAP_FIRST', 'CLASS', 'POSITION', 'NUMBER']
+
                 feature_cols = [c for c in vehicle_data.columns
-                               if c not in ['vehicle_number', 'lap_number', 'race', 'track']]
+                               if c not in exclude_cols and vehicle_data[c].dtype in ['float64', 'int64']]
 
                 avg_features = vehicle_data[feature_cols].mean().to_dict()
 
@@ -1226,11 +1359,11 @@ def create_post_race_x_callbacks(app):
                 dbc.Tabs(tabs, active_tab=f"dynamic-x-speed", className="mt-3"),
 
                 html.Hr(className="mt-4 mb-3"),
+                # DYNAMIC PRO TIP: Personalized advice based on vehicle's actual performance data
                 dbc.Alert([
                     html.I(className="fas fa-lightbulb me-2", style={'color': '#f39c12'}),
                     html.Strong("Pro Tip: "),
-                    "Focus on improving features marked as 'Very High Impact' first. Small improvements in Full Throttle %, ",
-                    "Maximum Lateral G, and Minimum Corner Speed yield the biggest lap time gains."
+                    generate_personalized_advice(vehicle_features, features_by_vehicle)[0]
                 ], color="info", className="mb-0")
             ], style={'padding': '2rem'})
         ], className="mb-4", style={
