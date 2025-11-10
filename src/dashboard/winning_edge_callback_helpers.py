@@ -41,6 +41,44 @@ def get_processor() -> WinningEdgeDataProcessor:
 
 
 # ============================================================================
+# TYPE CONVERSION UTILITIES (JSON Serialization Fix)
+# ============================================================================
+
+def convert_numpy_types(obj):
+    """
+    Recursively convert numpy types to native Python types for JSON serialization.
+
+    This function solves the issue where numpy int64/float64 types from DataFrame
+    operations cannot be serialized to JSON for Dash dcc.Store components.
+
+    Args:
+        obj: Any object that might contain numpy types
+
+    Returns:
+        Object with all numpy types converted to native Python types
+
+    Example:
+        >>> data = {'value': np.int64(5), 'score': np.float64(3.14)}
+        >>> convert_numpy_types(data)
+        {'value': 5, 'score': 3.14}
+    """
+    if isinstance(obj, (np.integer, np.int64, np.int32, np.int16, np.int8)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32, np.float16)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, (bool, np.bool_)):
+        return bool(obj)
+    else:
+        return obj
+
+
+# ============================================================================
 # HELPER FUNCTIONS FOR EACH VISUALIZATION
 # ============================================================================
 
@@ -61,6 +99,9 @@ def process_corner_data_for_heatmap(
     """
     try:
         processor = get_processor()
+
+        # Ensure vehicle_number is native Python int (not numpy.int64)
+        vehicle_number = int(vehicle_number) if vehicle_number is not None else 0
 
         # Extract corner metrics for this vehicle
         corner_metrics = processor.process_telemetry_for_corners(
@@ -92,10 +133,13 @@ def process_corner_data_for_heatmap(
                 'pct_of_total': (gap.total_time_gap / total_loss * 100) if total_loss > 0 else 0
             }
 
-        return corner_data
+        # Convert numpy types to native Python types for JSON serialization
+        return convert_numpy_types(corner_data)
 
     except Exception as e:
+        import traceback
         logger.error(f"Error processing corner data for heatmap: {e}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
         return {}
 
 
@@ -116,6 +160,10 @@ def process_speed_gap_data_for_spider(
     """
     try:
         processor = get_processor()
+
+        # Ensure vehicle_number is native Python int (not numpy.int64)
+        vehicle_number = int(vehicle_number) if vehicle_number is not None else 0
+
         corner_metrics = processor.process_telemetry_for_corners(
             telemetry_df,
             vehicle_number
@@ -140,7 +188,8 @@ def process_speed_gap_data_for_spider(
                 'exit_gap': gap.exit_speed_gap
             }
 
-        return speed_gaps
+        # Convert numpy types to native Python types for JSON serialization
+        return convert_numpy_types(speed_gaps)
 
     except Exception as e:
         logger.error(f"Error processing speed gap data for spider: {e}")
@@ -163,6 +212,10 @@ def process_brake_exit_correlation_data(
     """
     try:
         processor = get_processor()
+
+        # Ensure vehicle_number is native Python int (not numpy.int64)
+        vehicle_number = int(vehicle_number) if vehicle_number is not None else 0
+
         corner_metrics = processor.process_telemetry_for_corners(
             telemetry_df,
             vehicle_number
@@ -187,7 +240,12 @@ def process_brake_exit_correlation_data(
                 exit_deltas.append(gap.exit_speed_gap)
                 corner_names.append(gap.corner_name.replace('_', ' ').title())
 
-        return brake_deltas, exit_deltas, corner_names
+        # Convert numpy types to native Python types for JSON serialization
+        return (
+            convert_numpy_types(brake_deltas),
+            convert_numpy_types(exit_deltas),
+            convert_numpy_types(corner_names)
+        )
 
     except Exception as e:
         logger.error(f"Error processing brake-exit correlation data: {e}")
@@ -211,6 +269,10 @@ def process_phase_breakdown_data(
     """
     try:
         processor = get_processor()
+
+        # Ensure vehicle_number is native Python int (not numpy.int64)
+        vehicle_number = int(vehicle_number) if vehicle_number is not None else 0
+
         corner_metrics = processor.process_telemetry_for_corners(
             telemetry_df,
             vehicle_number
@@ -248,7 +310,8 @@ def process_phase_breakdown_data(
                 'exit': np.mean(exit_times) if exit_times else 0
             }
 
-        return phase_data
+        # Convert numpy types to native Python types for JSON serialization
+        return convert_numpy_types(phase_data)
 
     except Exception as e:
         logger.error(f"Error processing phase breakdown data: {e}")
@@ -272,6 +335,10 @@ def process_consistency_data(
     """
     try:
         processor = get_processor()
+
+        # Ensure vehicle_number is native Python int (not numpy.int64)
+        vehicle_number = int(vehicle_number) if vehicle_number is not None else 0
+
         corner_metrics = processor.process_telemetry_for_corners(
             telemetry_df,
             vehicle_number
@@ -302,7 +369,8 @@ def process_consistency_data(
                 'avg_time': np.mean(times)
             })
 
-        return consistency_data
+        # Convert numpy types to native Python types for JSON serialization
+        return convert_numpy_types(consistency_data)
 
     except Exception as e:
         logger.error(f"Error processing consistency data: {e}")
@@ -327,6 +395,10 @@ def process_action_card_data(
     """
     try:
         processor = get_processor()
+
+        # Ensure vehicle_number is native Python int (not numpy.int64)
+        vehicle_number = int(vehicle_number) if vehicle_number is not None else 0
+
         corner_metrics = processor.process_telemetry_for_corners(
             telemetry_df,
             vehicle_number
@@ -362,7 +434,8 @@ def process_action_card_data(
                     'exit_speed': tgt.exit_speed_target if hasattr(tgt, 'exit_speed_target') else None
                 }
 
-        return current, target
+        # Convert numpy types to native Python types for JSON serialization
+        return convert_numpy_types(current), convert_numpy_types(target)
 
     except Exception as e:
         logger.error(f"Error processing action card data: {e}")
@@ -381,14 +454,14 @@ def _find_best_lap(corner_metrics: List[CornerMetrics]) -> int:
     # Group by lap
     lap_times = {}
     for metric in corner_metrics:
-        lap = metric.lap_number
+        lap = int(metric.lap_number)  # Convert to native int
         if lap not in lap_times:
-            lap_times[lap] = 0
-        lap_times[lap] += metric.total_duration
+            lap_times[lap] = 0.0
+        lap_times[lap] += float(metric.total_duration)  # Convert to native float
 
     # Find best lap
     best_lap = min(lap_times.items(), key=lambda x: x[1])[0]
-    return best_lap
+    return int(best_lap)  # Ensure return value is native int
 
 
 def load_telemetry_from_json(data_json: str) -> Optional[pd.DataFrame]:
@@ -405,7 +478,9 @@ def load_telemetry_from_json(data_json: str) -> Optional[pd.DataFrame]:
         return None
 
     try:
-        df = pd.read_json(data_json, orient='split')
+        import io
+        df = pd.read_json(io.StringIO(data_json), orient='split')
+        logger.info(f"Loaded telemetry: {len(df)} rows, {len(df.columns)} columns")
         return df
     except Exception as e:
         logger.error(f"Error loading telemetry from JSON: {e}")
