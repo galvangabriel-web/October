@@ -139,11 +139,11 @@ class PerformanceGap:
     apex_speed_gap: float  # km/h
     exit_speed_gap: float  # km/h
 
-    # Brake point gap
-    brake_point_gap: Optional[float] = None  # meters (positive = too early)
-
     # Percentage of total lap time loss
     pct_of_total_loss: float
+
+    # Brake point gap (optional field must come after required fields)
+    brake_point_gap: Optional[float] = None  # meters (positive = too early)
 
 
 @dataclass
