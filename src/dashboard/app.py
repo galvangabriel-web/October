@@ -52,6 +52,7 @@ try:
     from src.dashboard.post_race_x_widget import create_post_race_x_layout, create_post_race_x_callbacks
     from src.dashboard.data_structure_widget import create_data_structure_layout
     from src.dashboard.enhanced_driver_insights_widget import create_enhanced_driver_insights_layout
+    from src.dashboard.winning_edge_widget import create_winning_edge_layout, create_winning_edge_callbacks
     from src.data_processing.weather_loader import WeatherDataLoader
     from src.data_processing.lap_analysis_loader import LapAnalysisLoader
     from src.data_processing.championship_loader import ChampionshipLoader
@@ -309,6 +310,14 @@ navbar = dbc.Navbar(
                     color="success",
                     size="sm",
                     className="me-2"
+                ),
+                dbc.Button(
+                    html.I(id="theme-icon", className="fas fa-moon"),
+                    id="theme-toggle",
+                    color="secondary",
+                    size="sm",
+                    title="Toggle Light/Dark Mode",
+                    className="ms-1"
                 )
             ], className="d-flex align-items-center"))
         ], className="ms-auto", navbar=True),
@@ -1042,6 +1051,7 @@ def create_dashboard_page():
                                 dbc.Tab(label="Sector Benchmarking", tab_id="tab-sectors", label_style={"cursor": "pointer"}),
                                 dbc.Tab(label="Championships", tab_id="tab-championships", label_style={"cursor": "pointer"}),
                                 dbc.Tab(label="Track Animation", tab_id="tab-animation", label_style={"cursor": "pointer"}),
+                                dbc.Tab(label="🏁 Winning Edge", tab_id="tab-winning-edge", label_style={"cursor": "pointer"}),
                                 dbc.Tab(label="Data Structure", tab_id="tab-data-structure", label_style={"cursor": "pointer"}),
                             ], id="tabs", active_tab="tab-insights", className="mb-3"),
                             html.Div(id="tab-content", style={'min-height': '70vh'})  # Minimum height for content
@@ -1132,15 +1142,6 @@ if PRODUCTION_MODE:
             dbc.Spinner(color="primary", size="lg"),
             html.Span("Loading...", style={'fontSize': '1.2rem', 'marginLeft': '1rem'})
         ], id="processing-overlay", className="processing-overlay", style={'display': 'none'}),
-
-        # Theme toggle button
-        dbc.Button(
-            html.I(id="theme-icon", className="fas fa-moon"),
-            id="theme-toggle",
-            className="theme-toggle-btn",
-            title="Toggle Light/Dark Mode"
-        ),
-
         # Show dashboard directly (no upload page)
         create_dashboard_page(),
 
@@ -1150,7 +1151,7 @@ if PRODUCTION_MODE:
         # Add help documentation system
         create_help_button(),
         create_help_documentation_modal(),
-    ], id="main-app-container")
+    ], id="main-app-container", **{'data-theme': 'light'})
 else:
     # Development mode: Keep two-page flow with manual upload
     app.layout = html.Div([
@@ -1348,8 +1349,8 @@ def render_tab_content(active_tab, n_clicks, vehicle_number, data_json):
     import datetime
     logger.info(f"[{datetime.datetime.now()}] Callback triggered - Tab: {active_tab}, Vehicle: {vehicle_number}")
 
-    # Week 1 tabs, animation tab, and post-race tabs don't require telemetry upload
-    if active_tab in ["tab-weather", "tab-sectors", "tab-championships", "tab-animation", "tab-post-race", "tab-post-race-x", "tab-data-structure"]:
+    # Week 1 tabs, animation tab, post-race tabs, and winning edge don't require telemetry upload
+    if active_tab in ["tab-weather", "tab-sectors", "tab-championships", "tab-animation", "tab-post-race", "tab-post-race-x", "tab-winning-edge", "tab-data-structure"]:
         if active_tab == "tab-animation":
             # Animation tab has its own upload mechanism
             return create_animation_layout()
@@ -1365,6 +1366,10 @@ def render_tab_content(active_tab, n_clicks, vehicle_number, data_json):
         if active_tab == "tab-data-structure":
             # Data Structure tab
             return create_data_structure_layout()
+
+        if active_tab == "tab-winning-edge":
+            # Winning Edge tab - comprehensive performance analysis
+            return create_winning_edge_layout()
 
         if not WEEK1_ENABLED:
             return dbc.Alert("Week 1 features not available. Missing data loaders.", color="warning")
@@ -2496,6 +2501,13 @@ if WEEK1_ENABLED:
     except Exception as e:
         logger.error(f"Failed to register post-race-x analysis callbacks: {e}")
 
+    # Register winning edge callbacks
+    try:
+        create_winning_edge_callbacks(app)
+        logger.info("Winning edge callbacks registered")
+    except Exception as e:
+        logger.error(f"Failed to register winning edge callbacks: {e}")
+
     # Register help documentation callbacks
     try:
         create_help_callbacks(app)
@@ -2602,6 +2614,18 @@ def toggle_theme(n_clicks, current_theme):
     icon_class = 'fas fa-sun' if new_theme == 'dark' else 'fas fa-moon'
 
     return new_theme, icon_class, new_theme
+
+
+@app.callback(
+    Output('tabs', 'active_tab'),
+    Input('hero-analyze-btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def navigate_to_insights(n_clicks):
+    """Navigate to Insights tab when hero button clicked"""
+    if n_clicks:
+        return 'tab-insights'
+    return dash.no_update
 
 
 @app.callback(
