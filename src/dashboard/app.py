@@ -40,6 +40,7 @@ try:
     if str(parent_dir) not in sys.path:
         sys.path.insert(0, str(parent_dir))
 
+    from src.config import DatasetLoader, DatasetConfig  # Per-tab dataset management
     from src.dashboard.weather_widget import create_weather_layout, create_weather_callbacks
     from src.dashboard.sector_widget import create_sector_layout, create_sector_callbacks
     from src.dashboard.animation_widget import create_animation_layout, create_animation_callbacks
@@ -177,6 +178,16 @@ _auto_loaded_stats = {
 }
 _last_update_time = None  # Timestamp of last data load
 
+# Winning Edge specific data storage (tab-specific dataset)
+_winning_edge_data = None
+_winning_edge_stats = {
+    'num_samples': 0,
+    'vehicle_options': [],
+    'num_vehicles': 0,
+    'num_laps': 0,
+}
+_winning_edge_loader = None  # DatasetLoader instance
+
 # Initialize Dash app with Bootstrap theme and custom stylesheets
 app = dash.Dash(
     __name__,
@@ -287,6 +298,72 @@ if PRODUCTION_MODE:
         logger.info("[OK] Data auto-loaded successfully")
     else:
         logger.warning("[WARN] Failed to auto-load data, dashboard will start empty")
+
+#================================================================
+# WINNING EDGE TAB-SPECIFIC DATA LOADING
+#================================================================
+
+def load_winning_edge_data():
+    """
+    Load dedicated dataset for Winning Edge tab using DatasetLoader.
+
+    This function implements per-tab data independence as specified in
+    the implementation plan. The Winning Edge tab uses its own dataset
+    (data/winning_edge_dataset.csv) separate from the global dataset.
+
+    Returns:
+        bool: True if data loaded successfully, False otherwise
+    """
+    global _winning_edge_data, _winning_edge_stats, _winning_edge_loader
+
+    try:
+        # Initialize DatasetLoader
+        _winning_edge_loader = DatasetLoader()
+        logger.info("Loading Winning Edge dedicated dataset...")
+
+        # Load tab-specific dataset with validation
+        df = _winning_edge_loader.load_dataset(
+            tab_name="winning_edge",
+            validate=True,
+            use_cache=False
+        )
+
+        # Store data as JSON for dcc.Store
+        _winning_edge_data = df.to_json(date_format='iso', orient='split')
+
+        # Calculate statistics
+        num_samples = len(df)
+        vehicles = sorted(df['vehicle_number'].unique()) if 'vehicle_number' in df.columns else []
+        num_vehicles = len(vehicles)
+        num_laps = df['lap'].nunique() if 'lap' in df.columns else 0
+
+        # Create vehicle dropdown options
+        vehicle_options = [{'label': f'Vehicle #{v}', 'value': v} for v in vehicles]
+
+        # Store stats
+        _winning_edge_stats = {
+            'num_samples': num_samples,
+            'vehicle_options': vehicle_options,
+            'num_vehicles': num_vehicles,
+            'num_laps': num_laps,
+        }
+
+        logger.info(f"[OK] Winning Edge dataset loaded: {num_samples:,} samples, {num_vehicles} vehicles, {num_laps} laps")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to load Winning Edge dataset: {e}", exc_info=True)
+        return False
+
+# Auto-load Winning Edge data if in production mode
+if PRODUCTION_MODE:
+    logger.info("="*60)
+    logger.info("Loading Winning Edge tab-specific dataset...")
+    logger.info("="*60)
+    if load_winning_edge_data():
+        logger.info("[OK] Winning Edge dataset loaded successfully")
+    else:
+        logger.warning("[WARN] Failed to load Winning Edge dataset, tab will use global data")
 
 #================================================================
 # LAYOUT
@@ -1120,6 +1197,10 @@ if PRODUCTION_MODE:
         # Structure: {'predictions': JSON, 'features_by_vehicle': {vehicle: {feature: value}}}
         dcc.Store(id='post-race-data-store'),
 
+        # Winning Edge tab-specific data store (dedicated dataset for corner analysis)
+        # This ensures data independence per tab as per implementation plan
+        dcc.Store(id='winning-edge-data', data=_winning_edge_data),
+
         # Auto-refresh interval (checks for data updates every 5 minutes)
         dcc.Interval(
             id='data-refresh-interval',
@@ -1164,6 +1245,9 @@ else:
         # Global post-race analysis data store (shared across Post-Race and Post-Race-X tabs)
         # Structure: {'predictions': JSON, 'features_by_vehicle': {vehicle: {feature: value}}}
         dcc.Store(id='post-race-data-store'),
+
+        # Winning Edge tab-specific data store (dedicated dataset for corner analysis)
+        dcc.Store(id='winning-edge-data'),
 
         # Auto-refresh interval (checks for data updates every 5 minutes)
         dcc.Interval(

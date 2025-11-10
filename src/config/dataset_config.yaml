@@ -1,0 +1,21 @@
+global:
+  dataset_path: master_racing_data.csv
+  fallback_enabled: true
+  cache_enabled: false
+tabs:
+  winning_edge:
+    dataset_path: data/winning_edge_dataset.csv
+    description: Dedicated dataset for Winning Edge tab - corner analysis and performance
+      gaps
+    enabled: true
+    cache_enabled: false
+  post_race:
+    dataset_path: data/post_race_dataset.csv
+    description: Dedicated dataset for Post-Race Analysis tab
+    enabled: false
+    cache_enabled: false
+  weather:
+    dataset_path: data/weather_dataset.csv
+    description: Dedicated dataset for Weather Analysis tab
+    enabled: false
+    cache_enabled: false
