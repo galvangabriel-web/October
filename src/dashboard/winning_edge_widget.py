@@ -73,12 +73,21 @@ def create_time_loss_heatmap(corner_data: Dict[str, Dict]) -> go.Figure:
         Plotly Figure with heatmap visualization
     """
     if not corner_data:
-        # Default example data
-        corner_data = {
-            'Turn 1<br>Uphill': {'time_loss': 0.210, 'pct_of_total': 48},
-            'Turn 6<br>Hairpin': {'time_loss': 0.180, 'pct_of_total': 41},
-            'Turn 11<br>Fast': {'time_loss': 0.050, 'pct_of_total': 11}
-        }
+        # Show empty chart with message to select vehicle and load data
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Please select a vehicle and ensure telemetry data is loaded",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color="gray")
+        )
+        fig.update_layout(
+            title="Time Loss Heat Map - No Data Available",
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            height=400
+        )
+        return fig
 
     corners = list(corner_data.keys())
     time_losses = [data['time_loss'] for data in corner_data.values()]
@@ -144,12 +153,20 @@ def create_speed_gap_spider(corner_metrics: Dict[str, List[float]]) -> go.Figure
     ]
 
     if not corner_metrics:
-        # Default example data
-        corner_metrics = {
-            'Turn 1': [97.8, 96.8, 97.1, 83.5, 68.5, 87.5],
-            'Turn 6': [97.5, 95.1, 96.3, 83.3, 52.3, 83.7],
-            'Turn 11 (Target)': [99.6, 98.9, 98.6, 116.9, 88.7, 94.8]
-        }
+        # Show empty chart with message
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Please select a vehicle and ensure telemetry data is loaded",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color="gray")
+        )
+        fig.update_layout(
+            title="Speed Gap Spider Chart - No Data Available",
+            polar=dict(radialaxis=dict(visible=False)),
+            height=500
+        )
+        return fig
 
     fig = go.Figure()
 
@@ -216,11 +233,22 @@ def create_brake_exit_correlation(brake_excess: List[float],
     Returns:
         Plotly Figure with correlation scatter plot
     """
-    if not brake_excess:
-        # Default example data
-        brake_excess = [0.62, 0.91, -0.45]
-        exit_deficit = [-0.62, -0.91, 0.45]
-        corner_labels = ['Turn 1', 'Turn 6', 'Turn 11']
+    if not brake_excess or not exit_deficit or not corner_labels:
+        # Show empty chart with message
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Please select a vehicle and ensure telemetry data is loaded",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color="gray")
+        )
+        fig.update_layout(
+            title="Brake-Exit Correlation - No Data Available",
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            height=500
+        )
+        return fig
 
     fig = go.Figure()
 
@@ -306,10 +334,28 @@ def create_speed_cascade_waterfall(corner_name: str,
         Plotly Figure with waterfall chart
     """
     if not cascade_data:
-        # Default example data for Turn 6
+        # Show empty chart with message
+        fig = go.Figure()
+        fig.add_annotation(
+            text=f"Please select a vehicle and ensure telemetry data is loaded for {corner_name}",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color="gray")
+        )
+        fig.update_layout(
+            title=f"{corner_name} Speed Cascade - No Data Available",
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            height=500
+        )
+        return fig
+
+    # Extract cascade data from the provided structure
+    if isinstance(cascade_data, dict) and corner_name in cascade_data:
+        corner_cascade = cascade_data[corner_name]
         cascade_data = {
-            'Entry Gap': -3.6,
-            'Apex Gap': -3.2,
+            'Entry Gap': corner_cascade.get('entry_gap', 0),
+            'Apex Gap': corner_cascade.get('apex_gap', 0),
             'Exit Gap': -3.7,
             'Straight Loss': -5.0
         }
@@ -354,12 +400,21 @@ def create_consistency_performance_matrix(corner_data: List[Dict]) -> go.Figure:
         Plotly Figure with bubble scatter plot
     """
     if not corner_data:
-        # Default example data
-        corner_data = [
-            {'name': 'Turn 1', 'consistency_pct': 87.5, 'efficiency_pct': 78.9, 'time_loss': 0.21},
-            {'name': 'Turn 6', 'consistency_pct': 83.7, 'efficiency_pct': 82.0, 'time_loss': 0.18},
-            {'name': 'Turn 11', 'consistency_pct': 94.8, 'efficiency_pct': 95.0, 'time_loss': 0.05}
-        ]
+        # Show empty chart with message
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Please select a vehicle and ensure telemetry data is loaded",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color="gray")
+        )
+        fig.update_layout(
+            title="Consistency Performance Matrix - No Data Available",
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            height=500
+        )
+        return fig
 
     fig = go.Figure()
 
@@ -433,10 +488,27 @@ def create_turn_action_card(turn_name: str,
         Plotly Figure with grouped bar chart
     """
     if not current_metrics or not target_metrics:
-        # Default example data for Turn 6
+        # Show empty chart with message
+        fig = go.Figure()
+        fig.add_annotation(
+            text=f"Please select a vehicle and ensure telemetry data is loaded for {turn_name}",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color="gray")
+        )
+        fig.update_layout(
+            title=f"{turn_name} Action Card - No Data Available",
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            height=400
+        )
+        return fig
+
+    # If we have data, continue with visualization
+    if 'Brake Point (m)' not in current_metrics:
         current_metrics = {
-            'Brake Point (m)': 120,
-            'Brake Pressure (%)': 95,
+            'Brake Point (m)': current_metrics.get('brake_point', 120),
+            'Brake Pressure (%)': current_metrics.get('brake_pressure', 95),
             'Throttle Timing (%)': 52.3,
             'Exit Speed (km/h)': 98.7
         }
@@ -510,14 +582,21 @@ def create_phase_distribution(phase_data: Dict[str, List[float]]) -> go.Figure:
         Plotly Figure with stacked bar chart
     """
     if not phase_data:
-        # Default example data
-        phase_data = {
-            'Turn 1 Current': [35, 20, 45],
-            'Turn 1 Target': [30, 20, 50],
-            'Turn 6 Current': [35, 20, 45],
-            'Turn 6 Target': [30, 20, 50],
-            'Turn 11 Benchmark': [25, 20, 55]
-        }
+        # Show empty chart with message
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Please select a vehicle and ensure telemetry data is loaded",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color="gray")
+        )
+        fig.update_layout(
+            title="Phase Distribution - No Data Available",
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            height=500
+        )
+        return fig
 
     corners = list(phase_data.keys())
     brake_pct = [data[0] for data in phase_data.values()]

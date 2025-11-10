@@ -56,6 +56,19 @@ except ImportError:
     DataValidationError = Exception
     AnalysisError = Exception
 
+    # Fallback stub classes
+    class InsightsConfig:
+        """Fallback config when insights module unavailable."""
+        def __init__(self, **kwargs):
+            # Accept any keyword arguments and set as attributes
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+    # Fallback stub analyzers
+    CornerAnalyzer = None
+    BrakePointAnalyzer = None
+    validate_telemetry_dataframe = lambda df: True
+
 logger = logging.getLogger(__name__)
 
 
