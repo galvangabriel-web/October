@@ -1665,68 +1665,169 @@ def create_winning_edge_callbacks(app):
     Args:
         app: Dash app instance
     """
+    # Import helper functions for vehicle-specific data processing
+    from src.dashboard.winning_edge_callback_helpers import (
+        process_corner_data_for_heatmap,
+        process_speed_gap_data_for_spider,
+        load_telemetry_from_json
+    )
 
     # ===== SECTION 1 CALLBACKS =====
     @app.callback(
         Output('winning-edge-heatmap', 'figure'),
-        Input('winning-edge-tabs', 'active_tab')
+        Input('winning-edge-tabs', 'active_tab'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_heatmap(active_tab):
-        """Update time loss heatmap when tab is activated."""
-        if active_tab == 'winning-edge-tab-1':
+    def update_heatmap(active_tab, selected_vehicle, data_json):
+        """Update time loss heatmap when tab is activated or vehicle changes."""
+        if active_tab != 'winning-edge-tab-1':
+            return go.Figure()
+
+        if not data_json or not selected_vehicle:
+            return create_time_loss_heatmap({})  # Show default if no data
+
+        try:
+            # Load telemetry and process for selected vehicle
+            telemetry_df = load_telemetry_from_json(data_json)
+            if telemetry_df is None:
+                return create_time_loss_heatmap({})
+
+            corner_data = process_corner_data_for_heatmap(telemetry_df, selected_vehicle)
+            return create_time_loss_heatmap(corner_data)
+        except Exception as e:
+            logger.error(f"Error in update_heatmap: {e}")
             return create_time_loss_heatmap({})
-        return go.Figure()
 
     @app.callback(
         Output('winning-edge-spider', 'figure'),
-        Input('winning-edge-tabs', 'active_tab')
+        Input('winning-edge-tabs', 'active_tab'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_spider(active_tab):
-        """Update speed gap spider chart when tab is activated."""
-        if active_tab == 'winning-edge-tab-1':
+    def update_spider(active_tab, selected_vehicle, data_json):
+        """Update speed gap spider chart when tab is activated or vehicle changes."""
+        if active_tab != 'winning-edge-tab-1':
+            return go.Figure()
+
+        if not data_json or not selected_vehicle:
+            return create_speed_gap_spider({})  # Show default if no data
+
+        try:
+            telemetry_df = load_telemetry_from_json(data_json)
+            if telemetry_df is None:
+                return create_speed_gap_spider({})
+
+            speed_gaps = process_speed_gap_data_for_spider(telemetry_df, selected_vehicle)
+            return create_speed_gap_spider(speed_gaps)
+        except Exception as e:
+            logger.error(f"Error in update_spider: {e}")
             return create_speed_gap_spider({})
-        return go.Figure()
 
     # ===== SECTION 2 CALLBACKS =====
+    from src.dashboard.winning_edge_callback_helpers import (
+        process_brake_exit_correlation_data,
+        process_consistency_data
+    )
+
     @app.callback(
         Output('winning-edge-correlation', 'figure'),
-        Input('winning-edge-tabs', 'active_tab')
+        Input('winning-edge-tabs', 'active_tab'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_correlation(active_tab):
+    def update_correlation(active_tab, selected_vehicle, data_json):
         """Update brake-exit correlation chart."""
-        if active_tab == 'winning-edge-tab-2':
+        if active_tab != 'winning-edge-tab-2':
+            return go.Figure()
+
+        if not data_json or not selected_vehicle:
             return create_brake_exit_correlation([], [], [])
-        return go.Figure()
+
+        try:
+            telemetry_df = load_telemetry_from_json(data_json)
+            if telemetry_df is None:
+                return create_brake_exit_correlation([], [], [])
+
+            brake_deltas, exit_deltas, corner_names = process_brake_exit_correlation_data(
+                telemetry_df, selected_vehicle
+            )
+            return create_brake_exit_correlation(brake_deltas, exit_deltas, corner_names)
+        except Exception as e:
+            logger.error(f"Error in update_correlation: {e}")
+            return create_brake_exit_correlation([], [], [])
 
     @app.callback(
         Output('winning-edge-cascade', 'figure'),
-        Input('winning-edge-tabs', 'active_tab')
+        Input('winning-edge-tabs', 'active_tab'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_cascade(active_tab):
+    def update_cascade(active_tab, selected_vehicle, data_json):
         """Update speed cascade waterfall chart."""
-        if active_tab == 'winning-edge-tab-2':
+        if active_tab != 'winning-edge-tab-2':
+            return go.Figure()
+
+        if not data_json or not selected_vehicle:
             return create_speed_cascade_waterfall('Turn 6', {})
-        return go.Figure()
+
+        try:
+            telemetry_df = load_telemetry_from_json(data_json)
+            if telemetry_df is None:
+                return create_speed_cascade_waterfall('Turn 6', {})
+
+            # Get corner data for selected vehicle
+            corner_data = process_corner_data_for_heatmap(telemetry_df, selected_vehicle)
+            # Find corner with highest loss
+            if corner_data:
+                max_loss_corner = max(corner_data.items(), key=lambda x: x[1]['time_loss'])
+                return create_speed_cascade_waterfall(max_loss_corner[0], corner_data)
+            return create_speed_cascade_waterfall('Turn 6', {})
+        except Exception as e:
+            logger.error(f"Error in update_cascade: {e}")
+            return create_speed_cascade_waterfall('Turn 6', {})
 
     @app.callback(
         Output('winning-edge-consistency', 'figure'),
-        Input('winning-edge-tabs', 'active_tab')
+        Input('winning-edge-tabs', 'active_tab'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_consistency(active_tab):
+    def update_consistency(active_tab, selected_vehicle, data_json):
         """Update consistency matrix chart."""
-        if active_tab == 'winning-edge-tab-2':
+        if active_tab != 'winning-edge-tab-2':
+            return go.Figure()
+
+        if not data_json or not selected_vehicle:
             return create_consistency_performance_matrix([])
-        return go.Figure()
+
+        try:
+            telemetry_df = load_telemetry_from_json(data_json)
+            if telemetry_df is None:
+                return create_consistency_performance_matrix([])
+
+            consistency_data = process_consistency_data(telemetry_df, selected_vehicle)
+            return create_consistency_performance_matrix(consistency_data)
+        except Exception as e:
+            logger.error(f"Error in update_consistency: {e}")
+            return create_consistency_performance_matrix([])
 
     # ===== SECTION 3 CALLBACKS =====
+    from src.dashboard.winning_edge_callback_helpers import (
+        process_action_card_data,
+        process_phase_breakdown_data
+    )
+
     @app.callback(
         Output('winning-edge-action-card-header', 'children'),
         Output('winning-edge-action-card-instructions', 'children'),
         Output('winning-edge-action-card', 'figure'),
-        Input('winning-edge-turn-selector', 'value')
+        Input('winning-edge-turn-selector', 'value'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_action_card(turn_name):
-        """Update action card based on selected turn."""
+    def update_action_card(turn_name, selected_vehicle, data_json):
+        """Update action card based on selected turn and vehicle."""
         instructions_map = {
             'Turn 6': html.Div([
                 html.P([
@@ -1755,19 +1856,48 @@ def create_winning_edge_callbacks(app):
 
         header = f"🏁 {turn_name} Transformation Card"
         instructions = instructions_map.get(turn_name, html.Div())
-        figure = create_turn_action_card(turn_name, {}, {})
+
+        # Get vehicle-specific data if available
+        current_metrics = {}
+        target_metrics = {}
+        if data_json and selected_vehicle:
+            try:
+                telemetry_df = load_telemetry_from_json(data_json)
+                if telemetry_df is not None:
+                    current_metrics, target_metrics = process_action_card_data(
+                        telemetry_df, selected_vehicle, turn_name
+                    )
+            except Exception as e:
+                logger.error(f"Error in update_action_card: {e}")
+
+        figure = create_turn_action_card(turn_name, current_metrics, target_metrics)
 
         return header, instructions, figure
 
     @app.callback(
         Output('winning-edge-phase', 'figure'),
-        Input('winning-edge-tabs', 'active_tab')
+        Input('winning-edge-tabs', 'active_tab'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_phase_distribution(active_tab):
+    def update_phase_distribution(active_tab, selected_vehicle, data_json):
         """Update phase distribution chart."""
-        if active_tab == 'winning-edge-tab-3':
+        if active_tab != 'winning-edge-tab-3':
+            return go.Figure()
+
+        if not data_json or not selected_vehicle:
             return create_phase_distribution({})
-        return go.Figure()
+
+        try:
+            telemetry_df = load_telemetry_from_json(data_json)
+            if telemetry_df is None:
+                return create_phase_distribution({})
+
+            phase_data = process_phase_breakdown_data(telemetry_df, selected_vehicle)
+            return create_phase_distribution(phase_data)
+        except Exception as e:
+            logger.error(f"Error in update_phase_distribution: {e}")
+            return create_phase_distribution({})
 
     # ===== SECTION 4 CALLBACKS =====
     @app.callback(
@@ -1783,68 +1913,104 @@ def create_winning_edge_callbacks(app):
 
     @app.callback(
         Output('winning-edge-overtaking', 'figure'),
-        Input('winning-edge-tabs', 'active_tab')
+        Input('winning-edge-tabs', 'active_tab'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_overtaking_map(active_tab):
-        """Update overtaking opportunity map."""
-        if active_tab == 'winning-edge-tab-4':
-            return create_overtaking_opportunity_map()
-        return go.Figure()
+    def update_overtaking_map(active_tab, selected_vehicle, data_json):
+        """Update overtaking opportunity map with vehicle-specific corner data."""
+        if active_tab != 'winning-edge-tab-4':
+            return go.Figure()
+
+        # For now, generic map - could be enhanced with vehicle-specific zones
+        return create_overtaking_opportunity_map()
 
     # ===== SECTION 5 CALLBACKS =====
     @app.callback(
         Output('winning-edge-timeline', 'figure'),
-        Input('winning-edge-tabs', 'active_tab')
+        Input('winning-edge-tabs', 'active_tab'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_timeline(active_tab):
+    def update_timeline(active_tab, selected_vehicle, data_json):
         """Update weekly target progression timeline."""
-        if active_tab == 'winning-edge-tab-5':
-            return create_weekly_target_progression()
-        return go.Figure()
+        if active_tab != 'winning-edge-tab-5':
+            return go.Figure()
+
+        # Timeline is generic improvement plan - not vehicle-specific
+        return create_weekly_target_progression()
 
     @app.callback(
         Output('winning-edge-curve', 'figure'),
-        Input('winning-edge-tabs', 'active_tab')
+        Input('winning-edge-tabs', 'active_tab'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_improvement_curve(active_tab):
+    def update_improvement_curve(active_tab, selected_vehicle, data_json):
         """Update improvement curve with progress tracking."""
-        if active_tab == 'winning-edge-tab-5':
-            return create_improvement_curve()
-        return go.Figure()
+        if active_tab != 'winning-edge-tab-5':
+            return go.Figure()
+
+        # Generic improvement curve - could be enhanced with vehicle tracking
+        return create_improvement_curve()
 
     # ===== SECTION 6 CALLBACKS =====
     @app.callback(
         Output('winning-edge-visual-guide-header', 'children'),
         Output('winning-edge-visual-guide', 'figure'),
-        Input('winning-edge-visual-turn-selector', 'value')
+        Input('winning-edge-visual-turn-selector', 'value'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_visual_guide(turn_name):
-        """Update turn visual guide based on selection."""
+    def update_visual_guide(turn_name, selected_vehicle, data_json):
+        """Update turn visual guide based on selection and vehicle data."""
         header = f"🏁 {turn_name}: Your New Racing Line"
+
+        # Could be enhanced with vehicle-specific racing line
         figure = create_turn_visual_guide(turn_name)
         return header, figure
 
     @app.callback(
         Output('winning-edge-brake-guide-header', 'children'),
         Output('winning-edge-brake-guide', 'figure'),
-        Input('winning-edge-visual-turn-selector', 'value')
+        Input('winning-edge-visual-turn-selector', 'value'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_brake_guide(turn_name):
-        """Update brake pressure guide based on selection."""
+    def update_brake_guide(turn_name, selected_vehicle, data_json):
+        """Update brake pressure guide based on selection and vehicle data."""
         header = f"🛑 {turn_name}: Brake Pressure Visualization"
+
+        # Could be enhanced with vehicle-specific brake profile
         figure = create_brake_pressure_guide(turn_name)
         return header, figure
 
     # ===== SECTION 7 CALLBACKS =====
     @app.callback(
         Output('winning-edge-summary', 'figure'),
-        Input('winning-edge-tabs', 'active_tab')
+        Input('winning-edge-tabs', 'active_tab'),
+        Input('vehicle-dropdown', 'value'),
+        State('upload-data', 'data')
     )
-    def update_summary_dashboard(active_tab):
-        """Update comprehensive summary dashboard."""
-        if active_tab == 'winning-edge-tab-7':
+    def update_summary_dashboard(active_tab, selected_vehicle, data_json):
+        """Update comprehensive summary dashboard with vehicle-specific data."""
+        if active_tab != 'winning-edge-tab-7':
+            return go.Figure()
+
+        if not data_json or not selected_vehicle:
             return create_comprehensive_dashboard({})
-        return go.Figure()
+
+        try:
+            telemetry_df = load_telemetry_from_json(data_json)
+            if telemetry_df is None:
+                return create_comprehensive_dashboard({})
+
+            # Get vehicle-specific corner data for summary
+            corner_data = process_corner_data_for_heatmap(telemetry_df, selected_vehicle)
+            return create_comprehensive_dashboard(corner_data)
+        except Exception as e:
+            logger.error(f"Error in update_summary_dashboard: {e}")
+            return create_comprehensive_dashboard({})
 
     logger.info("Winning Edge widget callbacks registered successfully")
 
