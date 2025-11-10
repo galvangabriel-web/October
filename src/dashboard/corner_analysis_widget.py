@@ -230,6 +230,303 @@ def _build_metric_rows(corner: Dict, category_id: str) -> List:
     return rows
 
 
+def calculate_corner_phases(corner_data: Dict) -> Dict:
+    """
+    Calculate time spent in each corner phase: Brake, Apex, Exit
+
+    Args:
+        corner_data: Dictionary with corner metrics
+
+    Returns:
+        Dictionary with phase breakdown analysis
+    """
+    # Extract time in corner (default to 5.0 seconds if not available)
+    total_corner_time = corner_data.get('time_in_corner', 5.0)
+
+    # Estimate brake duration from data (or use 35% of corner time as default)
+    brake_duration = corner_data.get('braking_duration', total_corner_time * 0.35)
+
+    # Apex phase typically 15-25% of corner time
+    apex_duration = total_corner_time * 0.20
+
+    # Exit phase is remaining time
+    exit_duration = total_corner_time - brake_duration - apex_duration
+
+    # Ensure no negative durations
+    if exit_duration < 0:
+        # Adjust if brake duration is too long
+        brake_duration = total_corner_time * 0.40
+        apex_duration = total_corner_time * 0.20
+        exit_duration = total_corner_time * 0.40
+
+    # Calculate optimal distribution (ideal racing line)
+    optimal_brake = total_corner_time * 0.30  # 30% braking
+    optimal_apex = total_corner_time * 0.20   # 20% apex
+    optimal_exit = total_corner_time * 0.50   # 50% exit (priority!)
+
+    # Calculate deltas
+    brake_delta = brake_duration - optimal_brake
+    apex_delta = apex_duration - optimal_apex
+    exit_delta = exit_duration - optimal_exit
+
+    return {
+        "actual": {
+            "brake": brake_duration,
+            "apex": apex_duration,
+            "exit": exit_duration
+        },
+        "optimal": {
+            "brake": optimal_brake,
+            "apex": optimal_apex,
+            "exit": optimal_exit
+        },
+        "delta": {
+            "brake": brake_delta,
+            "apex": apex_delta,
+            "exit": exit_delta
+        },
+        "total_time": total_corner_time
+    }
+
+
+def calculate_session_best(all_corners: List[Dict]) -> Dict:
+    """
+    Calculate session best lap time and corner-by-corner best times
+
+    Args:
+        all_corners: List of all corner data dictionaries from multiple laps
+
+    Returns:
+        Dictionary with session best metrics
+    """
+    if not all_corners or len(all_corners) == 0:
+        return {}
+
+    # Find fastest overall lap time
+    lap_times = [c.get('lap_time', 999.0) for c in all_corners if 'lap_time' in c]
+    fastest_lap = min(lap_times) if lap_times else 0.0
+
+    # Group corners by corner number
+    corners_by_number = {}
+    for corner in all_corners:
+        corner_num = corner.get('corner_number', corner.get('corner_name', 'Unknown'))
+        if corner_num not in corners_by_number:
+            corners_by_number[corner_num] = []
+        corners_by_number[corner_num].append(corner)
+
+    # Find best time for each corner
+    best_corner_times = {}
+    for corner_num, corners in corners_by_number.items():
+        corner_times = [c.get('time_in_corner', 999.0) for c in corners if 'time_in_corner' in c]
+        best_corner_times[corner_num] = min(corner_times) if corner_times else 0.0
+
+    return {
+        'fastest_lap': fastest_lap,
+        'best_corners': best_corner_times
+    }
+
+
+def create_session_best_badge(corner: Dict, session_best: Dict) -> html.Span:
+    """
+    Create session best badge showing delta to best time for this corner
+
+    Args:
+        corner: Current corner data
+        session_best: Output from calculate_session_best()
+
+    Returns:
+        Badge component showing session best status
+    """
+    if not session_best:
+        return html.Span()  # Empty if no session data
+
+    corner_num = corner.get('corner_number', corner.get('corner_name', 'Unknown'))
+    current_time = corner.get('time_in_corner', 0.0)
+    best_time = session_best.get('best_corners', {}).get(corner_num, 0.0)
+
+    if best_time == 0.0 or current_time == 0.0:
+        return html.Span()  # No data
+
+    delta_to_best = current_time - best_time
+
+    # Determine badge color and text
+    if abs(delta_to_best) < 0.05:  # Within 50ms of session best
+        badge_color = 'success'
+        badge_text = "SESSION BEST"
+        icon = "fas fa-trophy"
+    elif delta_to_best < 0.15:  # Within 150ms
+        badge_color = 'warning'
+        badge_text = f"+{delta_to_best:.3f}s"
+        icon = "fas fa-clock"
+    else:  # More than 150ms off
+        badge_color = 'danger'
+        badge_text = f"+{delta_to_best:.3f}s"
+        icon = "fas fa-chart-line"
+
+    return dbc.Badge([
+        html.I(className=f"{icon} me-1"),
+        badge_text
+    ], color=badge_color, className="ms-2", style={'fontSize': '0.7rem'})
+
+
+def create_phase_breakdown_visual(phases: Dict) -> html.Div:
+    """
+    Create visual phase breakdown chart with Brake/Apex/Exit phases
+
+    Args:
+        phases: Output from calculate_corner_phases()
+
+    Returns:
+        Dash Div component with phase visualization
+    """
+    actual = phases["actual"]
+    optimal = phases["optimal"]
+    delta = phases["delta"]
+    total_time = phases["total_time"]
+
+    # Calculate percentages for visualization
+    actual_total = sum(actual.values())
+    brake_pct = (actual["brake"] / actual_total) * 100
+    apex_pct = (actual["apex"] / actual_total) * 100
+    exit_pct = (actual["exit"] / actual_total) * 100
+
+    optimal_total = sum(optimal.values())
+    optimal_brake_pct = (optimal["brake"] / optimal_total) * 100
+    optimal_apex_pct = (optimal["apex"] / optimal_total) * 100
+    optimal_exit_pct = (optimal["exit"] / optimal_total) * 100
+
+    return html.Div([
+        html.H6([
+            html.I(className="fas fa-stopwatch me-2", style={'color': '#9b59b6'}),
+            "Corner Phase Breakdown"
+        ], className="mb-3", style={'fontSize': '0.9rem'}),
+
+        # Your actual phases
+        html.Div([
+            html.Small("Your Phases:", className="text-muted d-block mb-1", style={'fontSize': '0.8rem'}),
+            html.Div([
+                # Brake phase (RED)
+                html.Div([
+                    html.Div("BRAKE", style={
+                        'fontSize': '0.7rem',
+                        'fontWeight': 'bold',
+                        'color': 'white',
+                        'textAlign': 'center',
+                        'padding': '4px'
+                    })
+                ], style={
+                    'width': f'{brake_pct}%',
+                    'backgroundColor': '#e74c3c',
+                    'display': 'inline-block',
+                    'minWidth': '60px'
+                }),
+                # Apex phase (YELLOW)
+                html.Div([
+                    html.Div("APEX", style={
+                        'fontSize': '0.7rem',
+                        'fontWeight': 'bold',
+                        'color': 'black',
+                        'textAlign': 'center',
+                        'padding': '4px'
+                    })
+                ], style={
+                    'width': f'{apex_pct}%',
+                    'backgroundColor': '#f39c12',
+                    'display': 'inline-block',
+                    'minWidth': '50px'
+                }),
+                # Exit phase (GREEN)
+                html.Div([
+                    html.Div("EXIT", style={
+                        'fontSize': '0.7rem',
+                        'fontWeight': 'bold',
+                        'color': 'white',
+                        'textAlign': 'center',
+                        'padding': '4px'
+                    })
+                ], style={
+                    'width': f'{exit_pct}%',
+                    'backgroundColor': '#27ae60',
+                    'display': 'inline-block',
+                    'minWidth': '50px'
+                })
+            ], style={'borderRadius': '4px', 'overflow': 'hidden', 'display': 'flex'}),
+
+            # Time labels
+            html.Div([
+                html.Span(f"{actual['brake']:.2f}s", className="text-danger me-3", style={'fontSize': '0.75rem'}),
+                html.Span(f"{actual['apex']:.2f}s", className="text-warning me-3", style={'fontSize': '0.75rem'}),
+                html.Span(f"{actual['exit']:.2f}s", className="text-success", style={'fontSize': '0.75rem'}),
+            ], className="mt-1")
+        ], className="mb-3"),
+
+        # Optimal phases (semi-transparent for comparison)
+        html.Div([
+            html.Small("Optimal:", className="text-muted d-block mb-1", style={'fontSize': '0.8rem'}),
+            html.Div([
+                html.Div(style={
+                    'width': f'{optimal_brake_pct}%',
+                    'backgroundColor': '#e74c3c',
+                    'opacity': '0.4',
+                    'height': '8px',
+                    'display': 'inline-block'
+                }),
+                html.Div(style={
+                    'width': f'{optimal_apex_pct}%',
+                    'backgroundColor': '#f39c12',
+                    'opacity': '0.4',
+                    'height': '8px',
+                    'display': 'inline-block'
+                }),
+                html.Div(style={
+                    'width': f'{optimal_exit_pct}%',
+                    'backgroundColor': '#27ae60',
+                    'opacity': '0.4',
+                    'height': '8px',
+                    'display': 'inline-block'
+                })
+            ], style={'borderRadius': '4px', 'overflow': 'hidden', 'display': 'flex'}),
+
+            # Optimal time labels
+            html.Div([
+                html.Span(f"{optimal['brake']:.2f}s", className="me-3", style={'fontSize': '0.7rem', 'color': '#95a5a6'}),
+                html.Span(f"{optimal['apex']:.2f}s", className="me-3", style={'fontSize': '0.7rem', 'color': '#95a5a6'}),
+                html.Span(f"{optimal['exit']:.2f}s", style={'fontSize': '0.7rem', 'color': '#95a5a6'}),
+            ], className="mt-1")
+        ], className="mb-3"),
+
+        # Analysis
+        html.Div([
+            html.Small([
+                html.I(className="fas fa-chart-line me-2", style={'color': '#3498db'}),
+                html.Strong("Analysis:")
+            ], className="d-block mb-2", style={'fontSize': '0.85rem'}),
+            html.Ul([
+                html.Li([
+                    html.Strong("Braking: "),
+                    f"{delta['brake']:+.2f}s ",
+                    html.Span(
+                        "(brake earlier and lighter)" if delta['brake'] > 0 else "(good brake efficiency)",
+                        className="text-danger" if delta['brake'] > 0.1 else "text-success"
+                    )
+                ], style={'fontSize': '0.8rem'}, className="mb-1"),
+                html.Li([
+                    html.Strong("Exit: "),
+                    f"{delta['exit']:+.2f}s ",
+                    html.Span(
+                        "(get on throttle earlier!)" if delta['exit'] < -0.1 else "(good exit speed)",
+                        className="text-warning" if delta['exit'] < -0.1 else "text-success"
+                    )
+                ], style={'fontSize': '0.8rem'}, className="mb-1"),
+            ], className="mb-0", style={'paddingLeft': '1.2rem'})
+        ], className="p-2", style={'backgroundColor': '#f8f9fa', 'borderRadius': '4px'})
+    ], className="mb-3 p-3", style={
+        'border': '1px solid #dee2e6',
+        'borderRadius': '0.25rem',
+        'backgroundColor': '#ffffff'
+    })
+
+
 def create_corner_analysis_content(
     corner_analyses: Optional[List[Dict]] = None,
     category_id: str = 'speed'
@@ -253,6 +550,9 @@ def create_corner_analysis_content(
     # Get category-specific metrics configuration
     category_config = get_category_metrics(category_id)
 
+    # Calculate session best for all corners (Quick Win #4)
+    session_best = calculate_session_best(corner_analyses)
+
     # Create category description banner
     description_banner = dbc.Alert([
         html.I(className="fas fa-info-circle me-2"),
@@ -260,9 +560,9 @@ def create_corner_analysis_content(
         category_config['description']
     ], color="info", className="mb-3")
 
-    # Create corner cards with category-specific metrics
+    # Create corner cards with category-specific metrics and session best data
     corner_cards = [
-        create_corner_card(corner, i+1, category_id)
+        create_corner_card(corner, i+1, category_id, session_best)
         for i, corner in enumerate(corner_analyses)
     ]
 
@@ -308,7 +608,7 @@ def create_corner_analysis_modal(
     ], id="corner-analysis-modal", size="xl", is_open=is_open)
 
 
-def create_corner_card(corner: Dict, index: int, category_id: str = 'speed') -> dbc.Card:
+def create_corner_card(corner: Dict, index: int, category_id: str = 'speed', session_best: Optional[Dict] = None) -> dbc.Card:
     """
     Create individual corner analysis card with category-specific metrics
 
@@ -316,6 +616,7 @@ def create_corner_card(corner: Dict, index: int, category_id: str = 'speed') -> 
         corner: Corner analysis dictionary
         index: Corner number
         category_id: Category ID to determine which metrics to display
+        session_best: Optional session best data from calculate_session_best()
 
     Returns:
         Dash Bootstrap Card component
@@ -354,6 +655,7 @@ def create_corner_card(corner: Dict, index: int, category_id: str = 'speed') -> 
                 html.H5([
                     html.Span(f"#{index}", className="badge bg-dark me-2", style={'fontSize': '0.9rem'}),
                     html.Strong(corner_name),
+                    create_session_best_badge(corner, session_best),  # Quick Win #4
                     dbc.Badge(
                         severity_text,
                         color=severity_badge_color,
@@ -395,6 +697,9 @@ def create_corner_card(corner: Dict, index: int, category_id: str = 'speed') -> 
                     )
                 ], bordered=True, hover=True, size="sm", className="mb-3")
             ]),
+
+            # Phase breakdown section (Quick Win #3)
+            create_phase_breakdown_visual(calculate_corner_phases(corner)),
 
             # Opportunities section
             html.Div([

@@ -373,6 +373,125 @@ def create_demo_patterns_section() -> html.Div:
     return create_patterns_section(DEMO_PATTERNS)
 
 
+def create_consistency_card(consistency_data: Dict) -> dbc.Card:
+    """
+    Create consistency analysis card (Quick Win #5)
+
+    Args:
+        consistency_data: Output from calculate_consistency_metrics()
+
+    Returns:
+        Dash Bootstrap Card component
+    """
+    from src.dashboard.consistency_analysis import (
+        get_consistency_level,
+        get_consistency_coaching
+    )
+
+    overall_score = consistency_data.get("overall_consistency", 0)
+    total_laps = consistency_data.get("total_laps", 0)
+    most_consistent = consistency_data.get("most_consistent", [])
+    least_consistent = consistency_data.get("least_consistent", [])
+
+    # Get consistency level
+    level, color, icon = get_consistency_level(overall_score)
+
+    # Get coaching advice
+    coaching = get_consistency_coaching(overall_score)
+
+    return dbc.Card([
+        dbc.CardHeader([
+            html.H5([
+                html.I(className="fas fa-chart-bar me-2"),
+                "Lap-to-Lap Consistency Analysis",
+                dbc.Badge(
+                    f"{overall_score:.0f}/100",
+                    color=color,
+                    className="ms-2"
+                )
+            ], className="mb-0")
+        ]),
+        dbc.CardBody([
+            # Overall consistency indicator
+            html.Div([
+                html.Div([
+                    html.I(className=f"{icon} fa-3x mb-2", style={'color': f'var(--bs-{color})'})
+                ], className="text-center"),
+                html.H2(
+                    level,
+                    className=f"text-{color} text-center mb-1"
+                ),
+                html.P(
+                    f"Based on {total_laps} laps analyzed",
+                    className="text-muted text-center small mb-3"
+                )
+            ], className="mb-4"),
+
+            html.Hr(),
+
+            # Most consistent corners
+            html.Div([
+                html.H6([
+                    html.I(className="fas fa-check-circle me-2 text-success"),
+                    "Strengths - Most Consistent Corners"
+                ], className="mb-2"),
+                html.Ul([
+                    html.Li([
+                        html.Strong(f"Turn {corner[0]}: "),
+                        f"{corner[1]['consistency_score']:.0f}% ",
+                        html.Span(
+                            f"(±{corner[1]['apex_speed_std']:.1f} km/h apex speed variation)",
+                            className="text-muted small"
+                        )
+                    ], className="text-success")
+                    for corner in most_consistent
+                ], className="mb-3")
+            ]) if most_consistent else html.Div(),
+
+            # Least consistent corners (improvement areas)
+            html.Div([
+                html.H6([
+                    html.I(className="fas fa-exclamation-triangle me-2 text-warning"),
+                    "Focus on Consistency"
+                ], className="mb-2"),
+                html.Ul([
+                    html.Li([
+                        html.Strong(f"Turn {corner[0]}: "),
+                        f"{corner[1]['consistency_score']:.0f}% ",
+                        html.Div([
+                            html.Small([
+                                f"Entry: ±{corner[1]['entry_speed_std']:.1f} km/h, ",
+                                f"Apex: ±{corner[1]['apex_speed_std']:.1f} km/h, ",
+                                f"Exit: ±{corner[1]['exit_speed_std']:.1f} km/h"
+                            ], className="text-muted")
+                        ])
+                    ], className="text-danger mb-2")
+                    for corner in least_consistent
+                ])
+            ]) if least_consistent else html.Div(),
+
+            html.Hr(),
+
+            # Coaching advice
+            html.Div([
+                html.H6([
+                    html.I(className="fas fa-lightbulb me-2 text-warning"),
+                    "Consistency Coaching"
+                ], className="mb-2"),
+                html.P(
+                    coaching,
+                    className="mb-0",
+                    style={'fontSize': '0.9rem', 'lineHeight': '1.6'}
+                )
+            ], className="p-3", style={
+                'backgroundColor': '#f8f9fa',
+                'borderRadius': '0.25rem',
+                'borderLeft': '3px solid #f39c12'
+            })
+        ])
+    ], className="shadow-sm mb-4")
+
+
 if __name__ == '__main__':
     # Test the widget components
     print("Pattern Analysis Widget - Component Test")
