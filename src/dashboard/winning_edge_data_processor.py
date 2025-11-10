@@ -608,7 +608,18 @@ class WinningEdgeDataProcessor:
         # Find corner start/end
         corner_start_idx = in_corner.idxmax()
         corner_region = wide_data.loc[corner_start_idx:]
-        corner_end_idx = (~corner_region.iloc[1:][in_corner[corner_start_idx:]]).idxmax() if (~corner_region[in_corner[corner_start_idx:]]).any() else len(wide_data) - 1
+
+        # Fix: Ensure boolean mask type and handle ~ operator safely
+        corner_region_mask = (corner_region['speed'] < speed_threshold).astype(bool)
+        if not corner_region_mask.any():
+            corner_end_idx = len(wide_data) - 1
+        else:
+            # Find where we exit the corner (speed goes back above threshold)
+            not_in_corner = ~corner_region_mask
+            if not_in_corner.any():
+                corner_end_idx = not_in_corner.idxmax()
+            else:
+                corner_end_idx = len(wide_data) - 1
 
         corner_data = wide_data.loc[corner_start_idx:corner_end_idx]
 
@@ -761,15 +772,11 @@ class WinningEdgeDataProcessor:
         lap_number: int
     ) -> List[CornerMetrics]:
         """Process a single lap to extract corner metrics."""
-        # Detect corners using insights module or fallback
-        if self.corner_analyzer and INSIGHTS_AVAILABLE:
-            try:
-                corners = self.corner_analyzer.detect_corners(lap_data)
-            except Exception as e:
-                logger.error(f"Corner detection failed: {e}")
-                corners = self._fallback_corner_detection(lap_data)
-        else:
-            corners = self._fallback_corner_detection(lap_data)
+
+        # CRITICAL FIX: Use fallback corner detection (insights module CornerAnalyzer
+        # expects different data structure - designed for single-vehicle telemetry files)
+        # The fallback method is optimized for this dashboard's multi-vehicle long format
+        corners = self._fallback_corner_detection(lap_data)
 
         if not corners:
             return []
@@ -780,7 +787,7 @@ class WinningEdgeDataProcessor:
         for corner in corners:
             corner_id = corner.get('corner_id', 0)
 
-            # Extract phases
+            # Extract phases (pass original LONG format - it handles its own pivot)
             brake, apex, exit = self.extract_corner_phases(lap_data, corner_id)
 
             # Calculate overall metrics
@@ -823,7 +830,18 @@ class WinningEdgeDataProcessor:
         # Find start/end of braking
         brake_start_idx = braking.idxmax()
         brake_region = corner_data.loc[brake_start_idx:]
-        brake_end_idx = (~brake_region[braking[brake_start_idx:]]).idxmax() if (~brake_region[braking[brake_start_idx:]]).any() else corner_data.index[-1]
+
+        # Fix: Ensure boolean mask type and handle ~ operator safely
+        brake_region_mask = (brake_region['pbrake_f'] > brake_threshold).astype(bool)
+        if not brake_region_mask.any():
+            brake_end_idx = corner_data.index[-1]
+        else:
+            # Find where braking stops
+            not_braking = ~brake_region_mask
+            if not_braking.any():
+                brake_end_idx = not_braking.idxmax()
+            else:
+                brake_end_idx = corner_data.index[-1]
 
         brake_data = corner_data.loc[brake_start_idx:brake_end_idx]
 
@@ -902,12 +920,26 @@ class WinningEdgeDataProcessor:
             return telemetry_df  # Already wide format
 
         try:
-            wide = telemetry_df.pivot_table(
-                index='timestamp',
-                columns='telemetry_name',
-                values='telemetry_value',
-                aggfunc='first'
-            ).reset_index()
+            # Preserve metadata columns (vehicle_number, lap) during pivot
+            metadata_cols = [col for col in ['vehicle_number', 'lap'] if col in telemetry_df.columns]
+
+            if metadata_cols:
+                # Pivot with metadata columns in index to preserve them
+                wide = telemetry_df.pivot_table(
+                    index=['timestamp'] + metadata_cols,
+                    columns='telemetry_name',
+                    values='telemetry_value',
+                    aggfunc='first'
+                ).reset_index()
+            else:
+                # No metadata to preserve
+                wide = telemetry_df.pivot_table(
+                    index='timestamp',
+                    columns='telemetry_name',
+                    values='telemetry_value',
+                    aggfunc='first'
+                ).reset_index()
+
             return wide
         except Exception as e:
             logger.error(f"Failed to pivot telemetry: {e}")
